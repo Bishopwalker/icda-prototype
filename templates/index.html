@@ -14,11 +14,17 @@
         .status-bar { display: flex; gap: 1rem; justify-content: center; margin: 1rem 0; flex-wrap: wrap; }
         .badge { padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.85rem; background: rgba(255,255,255,0.1); }
         .badge.active { background: rgba(0,212,255,0.2); color: #00d4ff; }
+        .guardrails { display: flex; gap: 0.5rem; justify-content: center; margin: 1rem 0; flex-wrap: wrap; }
+        .guardrail-btn { padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.8rem; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #888; cursor: pointer; transition: all 0.2s; }
+        .guardrail-btn:hover { background: rgba(255,255,255,0.15); }
+        .guardrail-btn.active { background: rgba(255,82,82,0.3); border-color: #ff5252; color: #ff5252; }
+        .guardrail-btn.active::before { content: ""; margin-right: 0.3rem; }
         .chat { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; min-height: 400px; max-height: 500px; overflow-y: auto; }
         .msg { margin-bottom: 1rem; padding: 1rem; border-radius: 12px; max-width: 85%; }
         .msg.user { background: #00d4ff; color: #000; margin-left: auto; }
         .msg.bot { background: rgba(255,255,255,0.1); }
         .msg.error { background: rgba(255,82,82,0.2); border: 1px solid rgba(255,82,82,0.5); }
+        .msg.blocked { background: rgba(255,165,0,0.2); border: 1px solid rgba(255,165,0,0.5); }
         .meta { font-size: 0.75rem; color: #888; margin-top: 0.5rem; }
         .input-area { display: flex; gap: 1rem; }
         input { flex: 1; padding: 1rem; border: none; border-radius: 12px; background: rgba(255,255,255,0.1); color: #fff; font-size: 1rem; }
@@ -32,6 +38,7 @@
         .chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
         .chip { padding: 0.5rem 1rem; background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.3); border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
         .chip:hover { background: rgba(0,212,255,0.2); }
+        .section-label { font-size: 0.75rem; color: #666; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 1px; }
     </style>
 </head>
 <body>
@@ -41,6 +48,13 @@
             <div class="status-bar">
                 <span class="badge" id="status">Checking...</span>
                 <span class="badge" id="cache">Cache: 0</span>
+            </div>
+            <div class="section-label">Guardrails (click to toggle)</div>
+            <div class="guardrails">
+                <span class="guardrail-btn active" data-guard="pii" onclick="toggleGuard(this)">Block PII (SSN)</span>
+                <span class="guardrail-btn active" data-guard="financial" onclick="toggleGuard(this)">Block Financial</span>
+                <span class="guardrail-btn active" data-guard="credentials" onclick="toggleGuard(this)">Block Credentials</span>
+                <span class="guardrail-btn active" data-guard="offtopic" onclick="toggleGuard(this)">Block Off-Topic</span>
             </div>
         </header>
         <div class="chat" id="chat"></div>
@@ -60,7 +74,18 @@
     </div>
     <script>
         const chat = document.getElementById('chat'), q = document.getElementById('q'), btn = document.getElementById('btn');
+
+        // Guardrail state
+        const guardrails = { pii: true, financial: true, credentials: true, offtopic: true };
+
+        function toggleGuard(el) {
+            const guard = el.dataset.guard;
+            guardrails[guard] = !guardrails[guard];
+            el.classList.toggle('active', guardrails[guard]);
+        }
+
         const setQ = v => { q.value = v; q.focus(); };
+
         const addMsg = (txt, type, meta) => {
             const d = document.createElement('div');
             d.className = 'msg ' + type;
@@ -68,6 +93,7 @@
             chat.appendChild(d);
             chat.scrollTop = chat.scrollHeight;
         };
+
         async function send() {
             const query = q.value.trim();
             if (!query) return;
@@ -75,18 +101,26 @@
             q.value = '';
             btn.disabled = true;
             try {
-                const r = await fetch('/api/query', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query}) });
+                const r = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ query, guardrails })
+                });
                 const d = await r.json();
-                addMsg(d.response, d.success ? 'bot' : 'error', `${d.latency_ms}ms | ${d.cached ? 'Cached' : 'Fresh'}${d.tool_used ? ' | ' + d.tool_used : ''}`);
-                fetch('/api/cache/stats').then(r => r.json()).then(d => document.getElementById('cache').textContent = `Cache: ${d.valid}`);
+                const msgType = d.blocked ? 'blocked' : (d.success ? 'bot' : 'error');
+                const routeInfo = d.route ? ` | ${d.route}` : '';
+                addMsg(d.response, msgType, `${d.latency_ms}ms | ${d.cached ? 'Cached' : 'Fresh'}${routeInfo}${d.tool ? ' | ' + d.tool : ''}`);
+                fetch('/api/cache/stats').then(r => r.json()).then(d => document.getElementById('cache').textContent = `Cache: ${d.keys || 0}`);
             } catch(e) { addMsg('Error: ' + e.message, 'error'); }
             btn.disabled = false;
         }
+
         fetch('/api/health').then(r => r.json()).then(d => {
             const s = document.getElementById('status');
-            s.textContent = d.bedrock ? 'Bedrock Connected' : 'Bedrock Unavailable';
-            s.className = 'badge' + (d.bedrock ? ' active' : '');
+            s.textContent = d.nova ? 'Nova Connected' : 'Nova Unavailable';
+            s.className = 'badge' + (d.nova ? ' active' : '');
         });
+
         q.addEventListener('keypress', e => { if (e.key === 'Enter') send(); });
     </script>
 </body>

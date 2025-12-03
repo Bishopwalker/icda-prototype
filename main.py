@@ -61,14 +61,23 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="ICDA", version="0.5.0", lifespan=lifespan)
 
 
+class GuardrailSettings(BaseModel):
+    pii: bool = True
+    financial: bool = True
+    credentials: bool = True
+    offtopic: bool = True
+
+
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=500)
     bypass_cache: bool = False
+    guardrails: GuardrailSettings | None = None
 
 
 @app.post("/api/query")
 async def query(req: QueryRequest):
-    return await _router.route(req.query, req.bypass_cache)
+    guards = req.guardrails.model_dump() if req.guardrails else None
+    return await _router.route(req.query, req.bypass_cache, guards)
 
 
 @app.get("/api/health")

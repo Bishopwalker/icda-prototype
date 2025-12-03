@@ -3,7 +3,7 @@ from time import time
 
 from .cache import RedisCache
 from .database import CustomerDB
-from .guardrails import Guardrails
+from .guardrails import Guardrails, GuardrailFlags
 from .nova import NovaClient
 from .vector_index import VectorIndex, RouteType
 
@@ -18,12 +18,13 @@ class Router:
         self.db = db
         self.nova = nova
 
-    async def route(self, query: str, bypass_cache: bool = False) -> dict:
+    async def route(self, query: str, bypass_cache: bool = False, guardrails: dict | None = None) -> dict:
         start = time()
         q = query.strip()
 
         # 1. Guardrails
-        if blocked := Guardrails.check(q):
+        flags = GuardrailFlags(**guardrails) if guardrails else None
+        if blocked := Guardrails.check(q, flags):
             return self._response(q, blocked, RouteType.CACHE_HIT, start, blocked=True)
 
         # 2. Cache check
