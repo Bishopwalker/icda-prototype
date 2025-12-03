@@ -3,6 +3,5 @@ uvicorn[standard]==0.34.0
 boto3==1.35.86
 pydantic==2.10.3
 python-dotenv==1.0.1
-jinja2==3.1.4
-redis==5.2.1
-httpx==0.28.1
+redis[hiredis]==5.2.1
+opensearch-py[async]==2.8.0

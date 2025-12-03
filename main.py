@@ -5,6 +5,7 @@ Run with: uvicorn main:app --reload --port 8000
 
 import json
 import re
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from functools import cache
 from hashlib import sha256
@@ -18,6 +19,8 @@ from pydantic import BaseModel, Field
 import boto3
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
+import redis.asyncio as redis
+from opensearchpy import AsyncOpenSearch, AsyncHttpConnection, AWSV4SignerAsyncAuth
 
 load_dotenv()
 
@@ -33,54 +36,147 @@ class Config:
     aws_region: str = field(default_factory=lambda: getenv("AWS_REGION", "us-east-1"))
     nova_model: str = field(default_factory=lambda: getenv("NOVA_MODEL", "us.amazon.nova-micro-v1:0"))
     cache_ttl: int = 300
+    redis_url: str = field(default_factory=lambda: getenv("REDIS_URL", "redis://localhost:6379"))
+    opensearch_host: str = field(default_factory=lambda: getenv("OPENSEARCH_HOST", ""))
+    opensearch_index: str = field(default_factory=lambda: getenv("OPENSEARCH_INDEX", "customers"))
 
 CFG = Config()
 
 
 # ============================================================================
-# Cache
+# Redis Cache
 # ============================================================================
 
-class Cache:
-    __slots__ = ("_data", "ttl")
+class RedisCache:
+    __slots__ = ("client", "ttl", "available", "_fallback")
 
     def __init__(self, ttl: int = 300):
-        self._data: dict[str, tuple[str, float]] = {}
         self.ttl = ttl
+        self.client: redis.Redis | None = None
+        self.available = False
+        self._fallback: dict[str, tuple[str, float]] = {}
 
-    def get(self, key: str) -> str | None:
-        if (entry := self._data.get(key)) and time() < entry[1]:
+    async def connect(self, url: str) -> None:
+        try:
+            self.client = redis.from_url(url, decode_responses=True)
+            await self.client.ping()
+            self.available = True
+            print(f"Redis connected: {url}")
+        except Exception as e:
+            print(f"Redis unavailable, using in-memory fallback: {e}")
+            self.available = False
+
+    async def close(self) -> None:
+        if self.client:
+            await self.client.aclose()
+
+    async def get(self, key: str) -> str | None:
+        if self.available:
+            return await self.client.get(key)
+        if (entry := self._fallback.get(key)) and time() < entry[1]:
             return entry[0]
-        self._data.pop(key, None)
+        self._fallback.pop(key, None)
         return None
 
-    def set(self, key: str, value: str) -> None:
-        self._data[key] = (value, time() + self.ttl)
+    async def set(self, key: str, value: str) -> None:
+        if self.available:
+            await self.client.setex(key, self.ttl, value)
+        else:
+            self._fallback[key] = (value, time() + self.ttl)
 
-    def clear(self) -> None:
-        self._data.clear()
+    async def clear(self) -> None:
+        if self.available:
+            await self.client.flushdb()
+        else:
+            self._fallback.clear()
 
-    def stats(self) -> dict[str, int]:
+    async def stats(self) -> dict[str, int]:
+        if self.available:
+            info = await self.client.info("keyspace")
+            db_info = info.get("db0", {})
+            return {"total": db_info.get("keys", 0), "backend": "redis"}
         now = time()
-        valid = sum(1 for _, exp in self._data.values() if now < exp)
-        return {"total": len(self._data), "valid": valid}
+        valid = sum(1 for _, exp in self._fallback.values() if now < exp)
+        return {"total": len(self._fallback), "valid": valid, "backend": "memory"}
 
     @staticmethod
     @cache
     def make_key(query: str) -> str:
-        return sha256(query.casefold().strip().encode()).hexdigest()[:16]
+        return f"icda:{sha256(query.casefold().strip().encode()).hexdigest()[:16]}"
 
-_cache = Cache(CFG.cache_ttl)
+_cache = RedisCache(CFG.cache_ttl)
 
 
 # ============================================================================
-# CustomerData
+# OpenSearch Client
+# ============================================================================
+
+class OpenSearchClient:
+    __slots__ = ("client", "index", "available")
+
+    def __init__(self):
+        self.client: AsyncOpenSearch | None = None
+        self.index = CFG.opensearch_index
+        self.available = False
+
+    async def connect(self, host: str, region: str) -> None:
+        if not host:
+            print("OpenSearch host not configured")
+            return
+        try:
+            credentials = boto3.Session().get_credentials()
+            service = "aoss" if "aoss.amazonaws.com" in host else "es"
+            self.client = AsyncOpenSearch(
+                hosts=[{"host": host, "port": 443}],
+                http_auth=AWSV4SignerAsyncAuth(credentials, region, service),
+                use_ssl=True,
+                verify_certs=True,
+                connection_class=AsyncHttpConnection
+            )
+            await self.client.info()
+            self.available = True
+            print(f"OpenSearch connected: {host}")
+        except Exception as e:
+            print(f"OpenSearch unavailable: {e}")
+            self.available = False
+
+    async def close(self) -> None:
+        if self.client:
+            await self.client.close()
+
+    async def search(self, query: dict, size: int = 10) -> list[dict]:
+        if not self.available:
+            return []
+        resp = await self.client.search(index=self.index, body=query, size=size)
+        return [hit["_source"] for hit in resp["hits"]["hits"]]
+
+    async def lookup(self, crid: str) -> dict | None:
+        if not self.available:
+            return None
+        try:
+            resp = await self.client.get(index=self.index, id=crid)
+            return resp["_source"]
+        except Exception:
+            return None
+
+    async def index_doc(self, doc_id: str, doc: dict) -> bool:
+        if not self.available:
+            return False
+        await self.client.index(index=self.index, id=doc_id, body=doc)
+        return True
+
+_opensearch = OpenSearchClient()
+
+
+# ============================================================================
+# CustomerData (with OpenSearch fallback to local)
 # ============================================================================
 
 class CustomerData:
-    __slots__ = ("customers", "by_crid", "by_state")
+    __slots__ = ("customers", "by_crid", "by_state", "os_client")
 
-    def __init__(self, data_file: str = "customer_data.json"):
+    def __init__(self, os_client: OpenSearchClient, data_file: str = "customer_data.json"):
+        self.os_client = os_client
         self.customers = self._load(data_file)
         self.by_crid = {c["crid"]: c for c in self.customers}
         self.by_state: dict[str, list] = {}
@@ -91,7 +187,7 @@ class CustomerData:
         path = BASE_DIR / data_file
         if path.exists():
             data = json.loads(path.read_text())
-            print(f"Loaded {len(data)} customers")
+            print(f"Loaded {len(data)} customers from file")
             return data
         print(f"{data_file} not found")
         return [
@@ -99,28 +195,45 @@ class CustomerData:
             {"crid": "CRID-000002", "name": "Jane Doe", "state": "NV", "city": "Reno", "zip": "89501", "move_count": 2, "last_move": "2024-03-20", "address": "456 Oak Ave"},
         ]
 
-    def lookup(self, crid: str) -> dict:
+    async def lookup(self, crid: str) -> dict:
         crid = crid.upper()
+        # Try OpenSearch first
+        if self.os_client.available:
+            if data := await self.os_client.lookup(crid):
+                return {"success": True, "data": data, "source": "opensearch"}
+        # Fallback to local
         if crid.startswith("CRID-"):
             num = crid.removeprefix("CRID-")
             for fmt in (f"CRID-{num.zfill(6)}", f"CRID-{num.zfill(3)}", crid):
                 if data := self.by_crid.get(fmt):
-                    return {"success": True, "data": data}
+                    return {"success": True, "data": data, "source": "local"}
         return {"success": False, "error": f"CRID {crid} not found"}
 
-    def search(self, *, state: str | None = None, city: str | None = None, min_moves: int | None = None, limit: int = 10) -> dict:
+    async def search(self, *, state: str | None = None, city: str | None = None, min_moves: int | None = None, limit: int = 10) -> dict:
+        limit = min(limit, 100)
+        # Try OpenSearch first
+        if self.os_client.available:
+            must = []
+            if state:
+                must.append({"term": {"state": state.upper()}})
+            if city:
+                must.append({"match": {"city": city}})
+            if min_moves:
+                must.append({"range": {"move_count": {"gte": min_moves}}})
+            query = {"query": {"bool": {"must": must}} if must else {"match_all": {}}}
+            results = await self.os_client.search(query, size=limit)
+            return {"success": True, "total_matches": len(results), "data": results, "source": "opensearch"}
+        # Fallback to local
         results = self.by_state.get(state.upper(), []) if state else self.customers
         if min_moves:
             results = [c for c in results if c["move_count"] >= min_moves]
         if city:
             city_lower = city.casefold()
             results = [c for c in results if city_lower in c["city"].casefold()]
-        return {"success": True, "total_matches": len(results), "data": results[:min(limit, 100)]}
+        return {"success": True, "total_matches": len(results), "data": results[:limit], "source": "local"}
 
     def stats(self) -> dict:
         return {"success": True, "data": {s: len(c) for s, c in self.by_state.items()}}
-
-_data = CustomerData()
 
 
 # ============================================================================
@@ -143,12 +256,12 @@ class ToolExecutor:
     def __init__(self, data: CustomerData):
         self.data = data
 
-    def execute(self, name: str, params: dict) -> dict:
+    async def execute(self, name: str, params: dict) -> dict:
         match name:
             case "lookup_crid":
-                return self.data.lookup(params.get("crid", ""))
+                return await self.data.lookup(params.get("crid", ""))
             case "search_customers":
-                return self.data.search(
+                return await self.data.search(
                     state=params.get("state"),
                     city=params.get("city"),
                     min_moves=params.get("min_move_count"),
@@ -158,8 +271,6 @@ class ToolExecutor:
                 return self.data.stats()
             case _:
                 return {"success": False, "error": f"Unknown tool: {name}"}
-
-_tools = ToolExecutor(_data)
 
 
 # ============================================================================
@@ -216,7 +327,7 @@ class BedrockClient:
     def _extract_text(self, content: list) -> str | None:
         return next((b["text"] for b in content if "text" in b), None)
 
-    def query(self, text: str) -> dict:
+    async def query(self, text: str) -> dict:
         if not self.available:
             return {"success": False, "error": "Bedrock not available"}
 
@@ -225,7 +336,7 @@ class BedrockClient:
             content = resp["output"]["message"]["content"]
 
             if tool := next((b["toolUse"] for b in content if "toolUse" in b), None):
-                result = self.executor.execute(tool["name"], tool["input"])
+                result = await self.executor.execute(tool["name"], tool["input"])
                 follow = self._converse([
                     {"role": "user", "content": [{"text": text}]},
                     {"role": "assistant", "content": content},
@@ -245,14 +356,30 @@ class BedrockClient:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-_bedrock = BedrockClient(CFG.aws_region, CFG.nova_model, _tools)
-
 
 # ============================================================================
-# API
+# App Lifecycle & API
 # ============================================================================
 
-app = FastAPI(title="ICDA", version="0.2.0")
+_data: CustomerData = None
+_tools: ToolExecutor = None
+_bedrock: BedrockClient = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global _data, _tools, _bedrock
+    # Startup
+    await _cache.connect(CFG.redis_url)
+    await _opensearch.connect(CFG.opensearch_host, CFG.aws_region)
+    _data = CustomerData(_opensearch)
+    _tools = ToolExecutor(_data)
+    _bedrock = BedrockClient(CFG.aws_region, CFG.nova_model, _tools)
+    yield
+    # Shutdown
+    await _cache.close()
+    await _opensearch.close()
+
+app = FastAPI(title="ICDA", version="0.3.0", lifespan=lifespan)
 
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=500)
@@ -266,28 +393,34 @@ async def query(req: QueryRequest):
     if blocked := Guardrails.check(q):
         return {"success": False, "query": q, "response": blocked, "blocked": True, "latency_ms": int((time() - start) * 1000)}
 
-    key = Cache.make_key(q)
-    if not req.bypass_cache and (hit := _cache.get(key)):
+    key = RedisCache.make_key(q)
+    if not req.bypass_cache and (hit := await _cache.get(key)):
         return {"success": True, "query": q, "response": json.loads(hit)["response"], "cached": True, "latency_ms": int((time() - start) * 1000)}
 
-    result = _bedrock.query(q)
+    result = await _bedrock.query(q)
     if result["success"]:
-        _cache.set(key, json.dumps({"response": result["response"]}))
+        await _cache.set(key, json.dumps({"response": result["response"]}))
 
     return {"success": result["success"], "query": q, "response": result.get("response") or result.get("error"),
             "tool_used": result.get("tool_used"), "cached": False, "latency_ms": int((time() - start) * 1000)}
 
 @app.get("/api/health")
 async def health():
-    return {"status": "healthy", "bedrock": _bedrock.available, "customers": len(_data.customers)}
+    return {
+        "status": "healthy",
+        "bedrock": _bedrock.available if _bedrock else False,
+        "redis": _cache.available,
+        "opensearch": _opensearch.available,
+        "customers": len(_data.customers) if _data else 0
+    }
 
 @app.get("/api/cache/stats")
 async def cache_stats():
-    return _cache.stats()
+    return await _cache.stats()
 
 @app.delete("/api/cache")
 async def clear_cache():
-    _cache.clear()
+    await _cache.clear()
     return {"status": "cleared"}
 
 @app.get("/", response_class=HTMLResponse)
