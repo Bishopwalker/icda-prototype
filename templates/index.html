@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICDA Prototype</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: linear-gradient(135deg, #1a1a2e, #16213e); min-height: 100vh; color: #fff; }
+        .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+        header { text-align: center; margin-bottom: 2rem; }
+        header h1 { font-size: 2.5rem; }
+        header h1 span { color: #00d4ff; }
+        .status-bar { display: flex; gap: 1rem; justify-content: center; margin: 1rem 0; flex-wrap: wrap; }
+        .badge { padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.85rem; background: rgba(255,255,255,0.1); }
+        .badge.active { background: rgba(0,212,255,0.2); color: #00d4ff; }
+        .chat { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; min-height: 400px; max-height: 500px; overflow-y: auto; }
+        .msg { margin-bottom: 1rem; padding: 1rem; border-radius: 12px; max-width: 85%; }
+        .msg.user { background: #00d4ff; color: #000; margin-left: auto; }
+        .msg.bot { background: rgba(255,255,255,0.1); }
+        .msg.error { background: rgba(255,82,82,0.2); border: 1px solid rgba(255,82,82,0.5); }
+        .meta { font-size: 0.75rem; color: #888; margin-top: 0.5rem; }
+        .input-area { display: flex; gap: 1rem; }
+        input { flex: 1; padding: 1rem; border: none; border-radius: 12px; background: rgba(255,255,255,0.1); color: #fff; font-size: 1rem; }
+        input::placeholder { color: #666; }
+        input:focus { outline: 2px solid #00d4ff; }
+        button { padding: 1rem 2rem; border: none; border-radius: 12px; background: #00d4ff; color: #000; font-weight: 600; cursor: pointer; }
+        button:hover { transform: scale(1.05); }
+        button:disabled { opacity: 0.5; }
+        .examples { margin-top: 2rem; padding: 1.5rem; background: rgba(255,255,255,0.03); border-radius: 12px; }
+        .examples h3 { margin-bottom: 1rem; color: #888; font-size: 0.9rem; }
+        .chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .chip { padding: 0.5rem 1rem; background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.3); border-radius: 20px; font-size: 0.85rem; cursor: pointer; }
+        .chip:hover { background: rgba(0,212,255,0.2); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><span>ICDA</span> Prototype</h1>
+            <div class="status-bar">
+                <span class="badge" id="status">Checking...</span>
+                <span class="badge" id="cache">Cache: 0</span>
+            </div>
+        </header>
+        <div class="chat" id="chat"></div>
+        <div class="input-area">
+            <input type="text" id="q" placeholder="Ask about customers..." />
+            <button id="btn" onclick="send()">Send</button>
+        </div>
+        <div class="examples">
+            <h3>EXAMPLES:</h3>
+            <div class="chips">
+                <span class="chip" onclick="setQ('Look up CRID-001')">Look up CRID-001</span>
+                <span class="chip" onclick="setQ('Show me Nevada customers who moved twice')">Nevada + 2 moves</span>
+                <span class="chip" onclick="setQ('How many customers per state?')">Stats by state</span>
+                <span class="chip" onclick="setQ('Find customers in Las Vegas')">Las Vegas customers</span>
+            </div>
+        </div>
+    </div>
+    <script>
+        const chat = document.getElementById('chat'), q = document.getElementById('q'), btn = document.getElementById('btn');
+        const setQ = v => { q.value = v; q.focus(); };
+        const addMsg = (txt, type, meta) => {
+            const d = document.createElement('div');
+            d.className = 'msg ' + type;
+            d.innerHTML = txt + (meta ? `<div class="meta">${meta}</div>` : '');
+            chat.appendChild(d);
+            chat.scrollTop = chat.scrollHeight;
+        };
+        async function send() {
+            const query = q.value.trim();
+            if (!query) return;
+            addMsg(query, 'user');
+            q.value = '';
+            btn.disabled = true;
+            try {
+                const r = await fetch('/api/query', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query}) });
+                const d = await r.json();
+                addMsg(d.response, d.success ? 'bot' : 'error', `${d.latency_ms}ms | ${d.cached ? 'Cached' : 'Fresh'}${d.tool_used ? ' | ' + d.tool_used : ''}`);
+                fetch('/api/cache/stats').then(r => r.json()).then(d => document.getElementById('cache').textContent = `Cache: ${d.valid}`);
+            } catch(e) { addMsg('Error: ' + e.message, 'error'); }
+            btn.disabled = false;
+        }
+        fetch('/api/health').then(r => r.json()).then(d => {
+            const s = document.getElementById('status');
+            s.textContent = d.bedrock ? 'Bedrock Connected' : 'Bedrock Unavailable';
+            s.className = 'badge' + (d.bedrock ? ' active' : '');
+        });
+        q.addEventListener('keypress', e => { if (e.key === 'Enter') send(); });
+    </script>
+</body>
+</html>
