@@ -32,14 +32,15 @@ class CustomerDB:
                     return {"success": True, "data": data}
         return {"success": False, "error": f"CRID {crid} not found"}
 
-    def search(self, state: str = None, city: str = None, min_moves: int = None, limit: int = 10) -> dict:
+    def search(self, state: str = None, city: str = None, min_moves: int = None, limit: int = None) -> dict:
         results = self.by_state.get(state.upper(), []) if state else self.customers
         if min_moves:
             results = [c for c in results if c["move_count"] >= min_moves]
         if city:
             city_lower = city.casefold()
             results = [c for c in results if city_lower in c["city"].casefold()]
-        return {"success": True, "total": len(results), "data": results[:min(limit, 100)]}
+        data = results[:limit] if limit else results
+        return {"success": True, "total": len(results), "data": data}
 
     def stats(self) -> dict:
         return {"success": True, "data": {s: len(c) for s, c in self.by_state.items()}, "total": len(self.customers)}

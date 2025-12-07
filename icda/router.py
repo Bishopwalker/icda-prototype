@@ -62,12 +62,18 @@ class Router:
                 return f"Customer {c['name']} ({c['crid']}): {c['city']}, {c['state']}. Moved {c['move_count']} times."
             case "search_customers":
                 total = result["total"]
-                names = ", ".join(c["name"] for c in result["data"][:5])
-                return f"Found {total} customers. First 5: {names}{'...' if total > 5 else ''}"
+                customers = result["data"]
+                lines = [f"Found {total} customers:"]
+                for c in customers:
+                    lines.append(f"- {c['name']} ({c['crid']}): {c['city']}, {c['state']} - {c['move_count']} moves")
+                return "\n".join(lines)
             case "get_stats":
                 stats = result["data"]
-                top = sorted(stats.items(), key=lambda x: -x[1])[:5]
-                return f"Customer count: {', '.join(f'{s}: {n}' for s, n in top)}. Total: {result['total']}"
+                sorted_stats = sorted(stats.items(), key=lambda x: -x[1])
+                lines = [f"Customer count by state (Total: {result['total']}):"]
+                for state, count in sorted_stats:
+                    lines.append(f"- {state}: {count}")
+                return "\n".join(lines)
         return json.dumps(result)
 
     def _response(self, query: str, response: str, route: RouteType, start: float, **kwargs) -> dict:
