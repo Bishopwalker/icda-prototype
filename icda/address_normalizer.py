@@ -240,13 +240,18 @@ class AddressNormalizer:
             not has_zip,
         ])
 
-        # Determine quality
+        # Check for minimal viable address (can we work with this?)
+        # Even with missing pieces, we can try to complete if we have SOME info
+        has_location_anchor = has_zip or (has_city and has_state)
+        has_street_anchor = has_street or parsed.street_name
+
+        # Determine quality - more forgiving thresholds
         if missing_count == 0:
             quality = AddressQuality.COMPLETE
             confidence = 0.95
         elif missing_count == 1:
             quality = AddressQuality.PARTIAL
-            confidence = 0.75
+            confidence = 0.80  # Bumped from 0.75 - one missing is still very usable
             if not has_zip:
                 issues.append("Missing ZIP code")
                 suggestions.append("ZIP code can be inferred from city/state")
@@ -260,7 +265,24 @@ class AddressNormalizer:
                 issues.append("Missing or incomplete street address")
         elif missing_count == 2:
             quality = AddressQuality.PARTIAL
-            confidence = 0.50
+            confidence = 0.60  # Bumped from 0.50 - still workable
+            if not has_street:
+                issues.append("Missing street address")
+            if not has_city:
+                issues.append("Missing city")
+            if not has_state:
+                issues.append("Missing state")
+            if not has_zip:
+                issues.append("Missing ZIP code")
+        elif missing_count == 3 and (has_location_anchor or has_street_anchor):
+            # Still PARTIAL if we have something to work with
+            quality = AddressQuality.PARTIAL
+            confidence = 0.40
+            issues.append("Multiple missing components")
+            if has_location_anchor:
+                suggestions.append("Location identified - street details needed")
+            else:
+                suggestions.append("Street identified - location details needed")
             if not has_street:
                 issues.append("Missing street address")
             if not has_city:
@@ -270,10 +292,11 @@ class AddressNormalizer:
             if not has_zip:
                 issues.append("Missing ZIP code")
         else:
+            # Only INVALID if we have almost nothing to work with
             quality = AddressQuality.INVALID
-            confidence = 0.20
-            issues.append("Too many missing components")
-            suggestions.append("Provide at least street, city/state, or ZIP")
+            confidence = 0.15
+            issues.append("Insufficient address information")
+            suggestions.append("Provide street address, city, state, or ZIP code")
 
         # Check for ambiguity
         if parsed.street_name and not parsed.street_type:

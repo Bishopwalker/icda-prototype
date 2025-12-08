@@ -7,16 +7,26 @@ from .database import CustomerDB
 class NovaClient:
     __slots__ = ("client", "model", "available", "db")
 
-    _PROMPT = "You are ICDA, an AI assistant for customer data queries. Be concise. Never provide SSN, financial, or health info. You have access to conversation history - use it to maintain context."
+    _PROMPT = """You are ICDA, a customer data assistant. Be concise and helpful.
+
+QUERY INTERPRETATION:
+- Interpret queries flexibly, not literally
+- State names → abbreviations (Nevada=NV, California=CA, Texas=TX)
+- "high movers"/"frequent movers" → min_move_count 3+
+- Use reasonable defaults (limit=10 for searches)
+- Never provide SSN, financial, or health info
+- Use conversation history for context"""
 
     TOOLS = [
-        {"toolSpec": {"name": "lookup_crid", "description": "Look up customer by CRID",
-            "inputSchema": {"json": {"type": "object", "properties": {"crid": {"type": "string"}}, "required": ["crid"]}}}},
-        {"toolSpec": {"name": "search_customers", "description": "Search customers by state, city, or move count",
+        {"toolSpec": {"name": "lookup_crid", "description": "Look up a specific customer by their CRID (Customer Record ID). Use when user mentions a specific CRID or customer ID.",
+            "inputSchema": {"json": {"type": "object", "properties": {"crid": {"type": "string", "description": "The Customer Record ID (e.g., CRID-00001)"}}, "required": ["crid"]}}}},
+        {"toolSpec": {"name": "search_customers", "description": "Search for customers with flexible filters. Use when user asks about customers in a state/city, customers who moved, or general customer searches. Interpret informal language: 'Nevada folks'=state NV, 'high movers'=min_move_count 3+, 'California customers'=state CA.",
             "inputSchema": {"json": {"type": "object", "properties": {
-                "state": {"type": "string"}, "city": {"type": "string"},
-                "min_move_count": {"type": "integer"}, "limit": {"type": "integer"}}}}}},
-        {"toolSpec": {"name": "get_stats", "description": "Get customer statistics",
+                "state": {"type": "string", "description": "Two-letter state code (NV, CA, TX, NY, FL, etc). Convert state names to codes."},
+                "city": {"type": "string", "description": "City name to filter by"},
+                "min_move_count": {"type": "integer", "description": "Minimum number of moves. Use 2-3 for 'frequent movers', 5+ for 'high movers'"},
+                "limit": {"type": "integer", "description": "Max results to return (default 10, max 100)"}}}}}},
+        {"toolSpec": {"name": "get_stats", "description": "Get overall customer statistics including counts by state. Use for questions like 'how many customers', 'totals', 'breakdown', or any aggregate data questions.",
             "inputSchema": {"json": {"type": "object", "properties": {}}}}}
     ]
 
