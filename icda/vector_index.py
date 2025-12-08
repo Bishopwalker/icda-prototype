@@ -1,7 +1,8 @@
 from enum import Enum
+from typing import Callable
 
 import boto3
-from opensearchpy import AsyncOpenSearch, AsyncHttpConnection, AWSV4SignerAsyncAuth
+from opensearchpy import AsyncOpenSearch, AsyncHttpConnection, AWSV4SignerAsyncAuth, helpers
 
 from .embeddings import EmbeddingClient
 
@@ -13,8 +14,9 @@ class RouteType(str, Enum):
 
 
 class VectorIndex:
-    __slots__ = ("client", "index", "available", "embedder")
+    __slots__ = ("client", "index", "customer_index", "available", "embedder", "host", "region", "is_serverless")
 
+    # Routing index mapping (for query routing)
     INDEX_MAPPING = {
         "settings": {"index": {"knn": True}},
         "mappings": {
@@ -30,27 +32,62 @@ class VectorIndex:
         }
     }
 
+    # Customer index mapping (for semantic customer search)
+    CUSTOMER_INDEX_MAPPING = {
+        "settings": {"index": {"knn": True, "number_of_shards": 2, "number_of_replicas": 1}},
+        "mappings": {
+            "properties": {
+                "crid": {"type": "keyword"},
+                "name": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
+                "address": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
+                "city": {"type": "keyword"},
+                "state": {"type": "keyword"},
+                "zip": {"type": "keyword"},
+                "customer_type": {"type": "keyword"},
+                "status": {"type": "keyword"},
+                "move_count": {"type": "integer"},
+                "last_move": {"type": "date", "format": "yyyy-MM-dd", "null_value": "1970-01-01"},
+                "created_date": {"type": "date", "format": "yyyy-MM-dd"},
+                "search_text": {"type": "text"},  # Combined text for full-text search
+                "embedding": {"type": "knn_vector", "dimension": 1024, "method": {
+                    "name": "hnsw", "space_type": "cosinesimil", "engine": "nmslib",
+                    "parameters": {"ef_construction": 256, "m": 48}
+                }}
+            }
+        }
+    }
+
     def __init__(self, embedder: EmbeddingClient, index: str):
         self.client: AsyncOpenSearch | None = None
         self.index = index
+        self.customer_index = f"{index}-customers"
         self.available = False
         self.embedder = embedder
+        self.host = ""
+        self.region = ""
 
     async def connect(self, host: str, region: str) -> None:
         if not host:
             print("OpenSearch host not configured, router will use keyword matching")
             return
+        self.host = host
+        self.region = region
+        self.is_serverless = "aoss.amazonaws.com" in host
         try:
             credentials = boto3.Session().get_credentials()
-            service = "aoss" if "aoss.amazonaws.com" in host else "es"
+            service = "aoss" if self.is_serverless else "es"
             self.client = AsyncOpenSearch(
                 hosts=[{"host": host, "port": 443}],
                 http_auth=AWSV4SignerAsyncAuth(credentials, region, service),
                 use_ssl=True, verify_certs=True, connection_class=AsyncHttpConnection
             )
-            await self.client.info()
+            # Serverless doesn't support .info(), test with index list instead
+            if self.is_serverless:
+                await self.client.indices.get_alias()
+            else:
+                await self.client.info()
             self.available = True
-            print(f"OpenSearch connected: {host}")
+            print(f"OpenSearch {'Serverless ' if self.is_serverless else ''}connected: {host}")
             await self._ensure_index()
         except Exception as e:
             print(f"OpenSearch unavailable: {e}")
@@ -116,3 +153,285 @@ class VectorIndex:
         if any(kw in q for kw in ("how many", "count", "stats", "statistics")):
             return RouteType.DATABASE, {"tool": "get_stats"}
         return RouteType.NOVA, {}
+
+    # ==================== Customer Indexing Methods ====================
+
+    async def ensure_customer_index(self) -> bool:
+        """Create the customer index if it doesn't exist"""
+        if not self.available:
+            return False
+        try:
+            if not await self.client.indices.exists(index=self.customer_index):
+                await self.client.indices.create(index=self.customer_index, body=self.CUSTOMER_INDEX_MAPPING)
+                print(f"Created customer index: {self.customer_index}")
+            return True
+        except Exception as e:
+            print(f"Failed to create customer index: {e}")
+            return False
+
+    async def delete_customer_index(self) -> bool:
+        """Delete and recreate the customer index"""
+        if not self.available:
+            return False
+        try:
+            if await self.client.indices.exists(index=self.customer_index):
+                await self.client.indices.delete(index=self.customer_index)
+                print(f"Deleted customer index: {self.customer_index}")
+            return True
+        except Exception as e:
+            print(f"Failed to delete customer index: {e}")
+            return False
+
+    async def index_customers(self, customers: list[dict], batch_size: int = 100,
+                              progress_callback: Callable[[int, int], None] = None) -> dict:
+        """
+        Index customers into OpenSearch with embeddings.
+
+        Args:
+            customers: List of customer dicts from CustomerDB
+            batch_size: Number of customers to process at a time
+            progress_callback: Optional callback(indexed_count, total_count)
+
+        Returns:
+            dict with success status and counts
+        """
+        if not self.available:
+            return {"success": False, "error": "OpenSearch not available"}
+
+        await self.ensure_customer_index()
+
+        total = len(customers)
+        indexed = 0
+        errors = 0
+
+        for i in range(0, total, batch_size):
+            batch = customers[i:i + batch_size]
+            actions = []
+
+            for customer in batch:
+                # Create searchable text combining key fields
+                search_text = f"{customer['name']} {customer['address']} {customer['city']} {customer['state']}"
+
+                # Generate embedding for semantic search
+                embedding = self.embedder.embed(search_text)
+                if not embedding:
+                    errors += 1
+                    continue
+
+                doc_source = {
+                    "crid": customer["crid"],
+                    "name": customer["name"],
+                    "address": customer["address"],
+                    "city": customer["city"],
+                    "state": customer["state"],
+                    "zip": customer["zip"],
+                    "customer_type": customer["customer_type"],
+                    "status": customer["status"],
+                    "move_count": customer["move_count"],
+                    "last_move": customer.get("last_move") or "1970-01-01",
+                    "created_date": customer["created_date"],
+                    "search_text": search_text,
+                    "embedding": embedding
+                }
+
+                # Serverless doesn't support custom document IDs
+                if self.is_serverless:
+                    doc = {"_index": self.customer_index, "_source": doc_source}
+                else:
+                    doc = {"_index": self.customer_index, "_id": customer["crid"], "_source": doc_source}
+                actions.append(doc)
+
+            if actions:
+                try:
+                    success, failed = await helpers.async_bulk(self.client, actions, raise_on_error=False)
+                    indexed += success
+                    if failed:
+                        errors += len(failed)
+                        # Log first error for debugging
+                        if failed and len(failed) > 0:
+                            print(f"Bulk error sample: {failed[0]}")
+                except Exception as e:
+                    print(f"Bulk index error: {e}")
+                    errors += len(actions)
+
+            if progress_callback:
+                progress_callback(indexed, total)
+
+        # Refresh index to make documents searchable (not supported on Serverless)
+        if not self.is_serverless:
+            await self.client.indices.refresh(index=self.customer_index)
+
+        return {
+            "success": True,
+            "indexed": indexed,
+            "errors": errors,
+            "total": total
+        }
+
+    async def customer_count(self) -> int:
+        """Get count of indexed customers"""
+        if not self.available:
+            return 0
+        try:
+            if not await self.client.indices.exists(index=self.customer_index):
+                return 0
+            result = await self.client.count(index=self.customer_index)
+            return result["count"]
+        except Exception:
+            return 0
+
+    async def search_customers_semantic(self, query: str, limit: int = 10,
+                                         filters: dict = None) -> dict:
+        """
+        Semantic search for customers using vector similarity.
+
+        Args:
+            query: Natural language query (e.g., "customers in Las Vegas who moved frequently")
+            limit: Max results to return
+            filters: Optional filters like {"state": "NV", "min_moves": 2}
+
+        Returns:
+            dict with matching customers and scores
+        """
+        if not self.available:
+            return {"success": False, "error": "OpenSearch not available"}
+
+        embedding = self.embedder.embed(query)
+        if not embedding:
+            return {"success": False, "error": "Failed to generate embedding"}
+
+        # Build query with optional filters
+        must_clauses = []
+        if filters:
+            if filters.get("state"):
+                must_clauses.append({"term": {"state": filters["state"].upper()}})
+            if filters.get("city"):
+                must_clauses.append({"match": {"city": filters["city"]}})
+            if filters.get("min_moves"):
+                must_clauses.append({"range": {"move_count": {"gte": filters["min_moves"]}}})
+            if filters.get("status"):
+                must_clauses.append({"term": {"status": filters["status"].upper()}})
+            if filters.get("customer_type"):
+                must_clauses.append({"term": {"customer_type": filters["customer_type"].upper()}})
+
+        # KNN query with filters
+        if must_clauses:
+            search_body = {
+                "size": limit,
+                "query": {
+                    "bool": {
+                        "must": must_clauses,
+                        "should": [
+                            {"knn": {"embedding": {"vector": embedding, "k": limit * 2}}}
+                        ]
+                    }
+                }
+            }
+        else:
+            search_body = {
+                "size": limit,
+                "query": {"knn": {"embedding": {"vector": embedding, "k": limit}}}
+            }
+
+        try:
+            resp = await self.client.search(index=self.customer_index, body=search_body)
+            hits = resp["hits"]["hits"]
+
+            results = []
+            for hit in hits:
+                source = hit["_source"]
+                results.append({
+                    "crid": source["crid"],
+                    "name": source["name"],
+                    "address": source["address"],
+                    "city": source["city"],
+                    "state": source["state"],
+                    "zip": source["zip"],
+                    "customer_type": source["customer_type"],
+                    "status": source["status"],
+                    "move_count": source["move_count"],
+                    "score": round(hit["_score"], 4)
+                })
+
+            return {
+                "success": True,
+                "query": query,
+                "count": len(results),
+                "data": results
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def search_customers_hybrid(self, query: str, limit: int = 10,
+                                       filters: dict = None) -> dict:
+        """
+        Hybrid search combining full-text and semantic search.
+        Better for address autocomplete with typo tolerance.
+        """
+        if not self.available:
+            return {"success": False, "error": "OpenSearch not available"}
+
+        embedding = self.embedder.embed(query)
+
+        # Build filter clauses
+        filter_clauses = []
+        if filters:
+            if filters.get("state"):
+                filter_clauses.append({"term": {"state": filters["state"].upper()}})
+            if filters.get("min_moves"):
+                filter_clauses.append({"range": {"move_count": {"gte": filters["min_moves"]}}})
+
+        # Hybrid query: combine text match with KNN
+        search_body = {
+            "size": limit,
+            "query": {
+                "bool": {
+                    "should": [
+                        # Full-text search on combined fields
+                        {"multi_match": {
+                            "query": query,
+                            "fields": ["name^2", "address^3", "city^2", "search_text"],
+                            "type": "best_fields",
+                            "fuzziness": "AUTO"
+                        }},
+                    ],
+                    "filter": filter_clauses if filter_clauses else None
+                }
+            }
+        }
+
+        # Add KNN if embedding succeeded
+        if embedding:
+            search_body["query"]["bool"]["should"].append(
+                {"knn": {"embedding": {"vector": embedding, "k": limit}}}
+            )
+
+        # Remove None filter
+        if not filter_clauses:
+            del search_body["query"]["bool"]["filter"]
+
+        try:
+            resp = await self.client.search(index=self.customer_index, body=search_body)
+            hits = resp["hits"]["hits"]
+
+            results = []
+            for hit in hits:
+                source = hit["_source"]
+                results.append({
+                    "crid": source["crid"],
+                    "name": source["name"],
+                    "address": source["address"],
+                    "city": source["city"],
+                    "state": source["state"],
+                    "move_count": source["move_count"],
+                    "score": round(hit["_score"], 4)
+                })
+
+            return {
+                "success": True,
+                "query": query,
+                "count": len(results),
+                "data": results
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}

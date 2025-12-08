@@ -3,17 +3,17 @@ ICDA Prototype - Intelligent Customer Data Access
 Run with: uvicorn main:app --reload --port 8000
 """
 
-import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+load_dotenv()  # Must be before importing config
+
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
-from dotenv import load_dotenv
 
-from icda.config import cfg
+from icda.config import Config
 from icda.cache import RedisCache
 from icda.embeddings import EmbeddingClient
 from icda.vector_index import VectorIndex
@@ -21,12 +21,8 @@ from icda.database import CustomerDB
 from icda.nova import NovaClient
 from icda.router import Router
 from icda.session import SessionManager
-from icda.address_index import AddressIndex
-from icda.address_completer import NovaAddressCompleter
-from icda.address_pipeline import AddressPipeline
-from icda.address_router import router as address_router, configure_router
 
-load_dotenv()
+cfg = Config()  # Fresh instance after dotenv loaded
 
 BASE_DIR = Path(__file__).parent
 
@@ -38,22 +34,15 @@ _db: CustomerDB = None
 _nova: NovaClient = None
 _router: Router = None
 _sessions: SessionManager = None
-_address_index: AddressIndex = None
-_address_completer: NovaAddressCompleter = None
-_address_pipeline: AddressPipeline = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _cache, _embedder, _vector_index, _db, _nova, _router, _sessions
-    global _address_index, _address_completer, _address_pipeline
 
     # Startup
     _cache = RedisCache(cfg.cache_ttl)
     await _cache.connect(cfg.redis_url)
-
-    _sessions = SessionManager(_cache, ttl=3600)  # 1 hour session TTL
-    print(f"Session manager initialized (TTL: 1 hour)")
 
     _embedder = EmbeddingClient(cfg.aws_region, cfg.titan_embed_model, cfg.embed_dimensions)
 
@@ -64,17 +53,9 @@ async def lifespan(app: FastAPI):
 
     _nova = NovaClient(cfg.aws_region, cfg.nova_model, _db)
 
+    _sessions = SessionManager(_cache)
+
     _router = Router(_cache, _vector_index, _db, _nova, _sessions)
-
-    # Initialize address verification pipeline
-    _address_index = AddressIndex()
-    _address_index.build_from_customers(_db.customers)
-    print(f"Address index built with {_address_index.stats()['total_addresses']} addresses")
-
-    _address_completer = NovaAddressCompleter(cfg.aws_region, cfg.nova_model, _address_index)
-
-    _address_pipeline = AddressPipeline(_address_index, _address_completer)
-    configure_router(_address_pipeline)
 
     yield
 
@@ -83,19 +64,7 @@ async def lifespan(app: FastAPI):
     await _vector_index.close()
 
 
-app = FastAPI(title="ICDA", version="0.6.0", lifespan=lifespan)
-
-# CORS for frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173", "http://127.0.0.1:5174"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Mount address verification router
-app.include_router(address_router)
+app = FastAPI(title="ICDA", version="0.5.0", lifespan=lifespan)
 
 
 class GuardrailSettings(BaseModel):
@@ -109,112 +78,12 @@ class QueryRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=500)
     bypass_cache: bool = False
     guardrails: GuardrailSettings | None = None
-    session_id: str | None = None  # Pass to maintain conversation context
 
 
 @app.post("/api/query")
 async def query(req: QueryRequest):
-    """Process a text query with optional session context."""
     guards = req.guardrails.model_dump() if req.guardrails else None
-    return await _router.route(req.query, req.bypass_cache, guards, req.session_id)
-
-
-ALLOWED_EXTENSIONS = {".json", ".md"}
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-
-
-@app.post("/api/upload")
-async def upload_file(
-    file: UploadFile = File(...),
-    query: str = Form(default=""),
-    bypass_cache: bool = Form(default=False),
-    session_id: str | None = Form(default=None),
-):
-    """
-    Upload a .json or .md file for processing.
-    Optionally include a query to ask about the file content.
-    """
-    # Validate file extension
-    ext = Path(file.filename).suffix.lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(400, f"Only {', '.join(ALLOWED_EXTENSIONS)} files allowed")
-
-    # Read file content
-    content = await file.read()
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(400, f"File too large. Max size: {MAX_FILE_SIZE // (1024*1024)}MB")
-
-    try:
-        text_content = content.decode("utf-8")
-    except UnicodeDecodeError:
-        raise HTTPException(400, "File must be UTF-8 encoded")
-
-    # Parse JSON if applicable
-    file_data = None
-    if ext == ".json":
-        try:
-            file_data = json.loads(text_content)
-        except json.JSONDecodeError as e:
-            raise HTTPException(400, f"Invalid JSON: {e}")
-
-    # Build the query with file context
-    if query:
-        full_query = f"Based on the uploaded {ext} file content:\n\n{text_content[:5000]}\n\nUser question: {query}"
-    else:
-        full_query = f"Analyze this {ext} file:\n\n{text_content[:5000]}"
-
-    # Route through the system
-    result = await _router.route(full_query, bypass_cache, None, session_id)
-    result["file_name"] = file.filename
-    result["file_type"] = ext
-    result["file_size"] = len(content)
-
-    return result
-
-
-@app.post("/api/query-with-file")
-async def query_with_file(
-    query: str = Form(...),
-    file: UploadFile | None = File(default=None),
-    bypass_cache: bool = Form(default=False),
-    session_id: str | None = Form(default=None),
-    pii: bool = Form(default=True),
-    financial: bool = Form(default=True),
-    credentials: bool = Form(default=True),
-    offtopic: bool = Form(default=True),
-):
-    """
-    Unified endpoint: accepts text query with optional file upload.
-    Supports both .json and .md files.
-    """
-    guards = {"pii": pii, "financial": financial, "credentials": credentials, "offtopic": offtopic}
-
-    # If no file, just process the text query
-    if file is None or file.filename == "":
-        return await _router.route(query, bypass_cache, guards, session_id)
-
-    # Validate file
-    ext = Path(file.filename).suffix.lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(400, f"Only {', '.join(ALLOWED_EXTENSIONS)} files allowed")
-
-    content = await file.read()
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(400, f"File too large. Max: {MAX_FILE_SIZE // (1024*1024)}MB")
-
-    try:
-        text_content = content.decode("utf-8")
-    except UnicodeDecodeError:
-        raise HTTPException(400, "File must be UTF-8 encoded")
-
-    # Build combined query
-    full_query = f"File: {file.filename}\nContent:\n{text_content[:5000]}\n\nQuestion: {query}"
-
-    result = await _router.route(full_query, bypass_cache, guards, session_id)
-    result["file_name"] = file.filename
-    result["file_type"] = ext
-
-    return result
+    return await _router.route(req.query, req.bypass_cache, guards)
 
 
 @app.get("/api/health")
@@ -236,32 +105,81 @@ async def cache_stats():
 
 @app.delete("/api/cache")
 async def clear_cache():
-    """Clear query cache (not sessions)."""
     await _cache.clear()
     return {"status": "cleared"}
 
 
-# Session Management Endpoints
-@app.delete("/api/session/{session_id}")
-async def delete_session(session_id: str):
-    """Delete a specific session (clears conversation history)."""
-    await _sessions.delete(session_id)
-    return {"status": "deleted", "session_id": session_id}
+@app.get("/api/autocomplete/{field}")
+async def autocomplete(field: str, q: str, limit: int = 10, fuzzy: bool = False):
+    """
+    Autocomplete endpoint for address, name, or city fields.
+
+    Examples:
+      /api/autocomplete/address?q=123 Main
+      /api/autocomplete/name?q=John
+      /api/autocomplete/city?q=Las
+      /api/autocomplete/address?q=main&fuzzy=true  (slower, handles typos)
+    """
+    if fuzzy:
+        return _db.autocomplete_fuzzy(field, q, limit)
+    return _db.autocomplete(field, q, limit)
 
 
-@app.delete("/api/sessions")
-async def clear_all_sessions():
-    """Clear all sessions."""
-    count = await _sessions.clear_all()
-    return {"status": "cleared", "count": count}
+@app.get("/api/search/semantic")
+async def semantic_search(q: str, limit: int = 10, state: str = None, city: str = None,
+                          min_moves: int = None, status: str = None, customer_type: str = None):
+    """
+    Semantic search for customers using vector similarity (requires OpenSearch).
+
+    Examples:
+      /api/search/semantic?q=customers in Las Vegas
+      /api/search/semantic?q=high movers&state=CA&min_moves=3
+      /api/search/semantic?q=business customers&customer_type=BUSINESS
+
+    Filters: state, city, min_moves, status, customer_type
+    """
+    filters = {}
+    if state:
+        filters["state"] = state
+    if city:
+        filters["city"] = city
+    if min_moves:
+        filters["min_moves"] = min_moves
+    if status:
+        filters["status"] = status
+    if customer_type:
+        filters["customer_type"] = customer_type
+
+    return await _vector_index.search_customers_semantic(q, limit, filters if filters else None)
 
 
-@app.post("/api/session/new")
-async def new_session():
-    """Create a new empty session and return its ID."""
-    import uuid
-    session_id = str(uuid.uuid4())
-    return {"session_id": session_id}
+@app.get("/api/search/hybrid")
+async def hybrid_search(q: str, limit: int = 10, state: str = None, min_moves: int = None):
+    """
+    Hybrid search combining full-text and semantic search.
+    Better for address autocomplete with typo tolerance.
+
+    Examples:
+      /api/search/hybrid?q=123 mian street  (handles typos)
+      /api/search/hybrid?q=john smth las vegas
+    """
+    filters = {}
+    if state:
+        filters["state"] = state
+    if min_moves:
+        filters["min_moves"] = min_moves
+
+    return await _vector_index.search_customers_hybrid(q, limit, filters if filters else None)
+
+
+@app.get("/api/index/status")
+async def index_status():
+    """Get status of OpenSearch customer index"""
+    return {
+        "opensearch_available": _vector_index.available if _vector_index else False,
+        "customer_index": _vector_index.customer_index if _vector_index else None,
+        "indexed_customers": await _vector_index.customer_count() if _vector_index else 0
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
