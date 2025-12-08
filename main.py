@@ -20,7 +20,6 @@ from icda.vector_index import VectorIndex
 from icda.database import CustomerDB
 from icda.nova import NovaClient
 from icda.router import Router
-from icda.session import SessionManager
 
 cfg = Config()  # Fresh instance after dotenv loaded
 
@@ -33,12 +32,11 @@ _vector_index: VectorIndex = None
 _db: CustomerDB = None
 _nova: NovaClient = None
 _router: Router = None
-_sessions: SessionManager = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _cache, _embedder, _vector_index, _db, _nova, _router, _sessions
+    global _cache, _embedder, _vector_index, _db, _nova, _router
 
     # Startup
     _cache = RedisCache(cfg.cache_ttl)
@@ -53,9 +51,7 @@ async def lifespan(app: FastAPI):
 
     _nova = NovaClient(cfg.aws_region, cfg.nova_model, _db)
 
-    _sessions = SessionManager(_cache)
-
-    _router = Router(_cache, _vector_index, _db, _nova, _sessions)
+    _router = Router(_cache, _vector_index, _db, _nova)
 
     yield
 
