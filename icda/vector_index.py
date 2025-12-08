@@ -100,18 +100,58 @@ class VectorIndex:
 
     async def _seed_routing_data(self) -> None:
         routing_docs = [
+            # === LOOKUP queries (CRID/ID-based) ===
             {"text": "look up customer by CRID", "type": "endpoint", "route": "database", "metadata": {"tool": "lookup_crid"}},
             {"text": "find customer record ID", "type": "endpoint", "route": "database", "metadata": {"tool": "lookup_crid"}},
+            {"text": "get customer details for CRID", "type": "endpoint", "route": "database", "metadata": {"tool": "lookup_crid"}},
+            {"text": "show me customer info", "type": "endpoint", "route": "database", "metadata": {"tool": "lookup_crid"}},
+            {"text": "what's the record for this customer", "type": "endpoint", "route": "database", "metadata": {"tool": "lookup_crid"}},
+            {"text": "pull up that customer", "type": "endpoint", "route": "database", "metadata": {"tool": "lookup_crid"}},
+
+            # === SEARCH queries (state, city, moves) ===
             {"text": "search customers by state", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
             {"text": "customers in Nevada California Texas", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
             {"text": "customers who moved twice three times", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
             {"text": "high movers frequent movers", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
+            {"text": "give me all Nevada residents", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
+            {"text": "list California customers", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
+            {"text": "I want to see customers from TX", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
+            {"text": "show customers in New York", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
+            {"text": "people who relocated multiple times", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
+            {"text": "customers who move a lot", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
+            {"text": "find people in Las Vegas", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
+            {"text": "customers living in Miami", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
+            {"text": "who lives in Denver", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
+            {"text": "customers from the west coast", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
+            {"text": "show me relocators", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
+            {"text": "active customers in state", "type": "endpoint", "route": "database", "metadata": {"tool": "search_customers"}},
+
+            # === STATS queries (counts, aggregations) ===
             {"text": "customer statistics count by state", "type": "endpoint", "route": "database", "metadata": {"tool": "get_stats"}},
             {"text": "how many customers total", "type": "endpoint", "route": "database", "metadata": {"tool": "get_stats"}},
+            {"text": "states with most customers", "type": "endpoint", "route": "database", "metadata": {"tool": "get_stats"}},
+            {"text": "which state has the most moves", "type": "endpoint", "route": "database", "metadata": {"tool": "get_stats"}},
+            {"text": "customer numbers breakdown", "type": "endpoint", "route": "database", "metadata": {"tool": "get_stats"}},
+            {"text": "give me the totals", "type": "endpoint", "route": "database", "metadata": {"tool": "get_stats"}},
+            {"text": "overall customer count", "type": "endpoint", "route": "database", "metadata": {"tool": "get_stats"}},
+            {"text": "summary of customers per state", "type": "endpoint", "route": "database", "metadata": {"tool": "get_stats"}},
+
+            # === NOVA queries (analysis, insights, recommendations) ===
             {"text": "analyze trends patterns", "type": "document", "route": "nova", "metadata": {}},
             {"text": "explain why customers moving", "type": "document", "route": "nova", "metadata": {}},
             {"text": "compare summarize insights", "type": "document", "route": "nova", "metadata": {}},
             {"text": "recommend suggest predict", "type": "document", "route": "nova", "metadata": {}},
+            {"text": "predict which customers will move", "type": "document", "route": "nova", "metadata": {}},
+            {"text": "analyze relocation trends", "type": "document", "route": "nova", "metadata": {}},
+            {"text": "compare Nevada vs California", "type": "document", "route": "nova", "metadata": {}},
+            {"text": "what are the migration patterns", "type": "document", "route": "nova", "metadata": {}},
+            {"text": "why do people relocate so much", "type": "document", "route": "nova", "metadata": {}},
+            {"text": "insights on customer behavior", "type": "document", "route": "nova", "metadata": {}},
+            {"text": "which customers should we contact", "type": "document", "route": "nova", "metadata": {}},
+            {"text": "tell me about the data", "type": "document", "route": "nova", "metadata": {}},
+            {"text": "help me understand this", "type": "document", "route": "nova", "metadata": {}},
+            {"text": "what does this mean", "type": "document", "route": "nova", "metadata": {}},
+            {"text": "general question about customers", "type": "document", "route": "nova", "metadata": {}},
         ]
         for doc in routing_docs:
             doc["embedding"] = self.embedder.embed(doc["text"])
@@ -145,13 +185,36 @@ class VectorIndex:
         return RouteType.DATABASE if best_route == "database" else RouteType.NOVA, metadata
 
     def _keyword_route(self, query: str) -> tuple[RouteType, dict]:
+        """Fallback keyword-based routing when OpenSearch is unavailable."""
         q = query.casefold()
-        if any(kw in q for kw in ("crid", "look up", "lookup", "find customer")):
+
+        # LOOKUP: CRID-based customer retrieval
+        lookup_keywords = (
+            "crid", "look up", "lookup", "find customer", "get customer",
+            "show me customer", "pull up", "customer record", "customer details"
+        )
+        if any(kw in q for kw in lookup_keywords):
             return RouteType.DATABASE, {"tool": "lookup_crid"}
-        if any(kw in q for kw in ("search", "customers in", "state", "moved", "movers")):
-            return RouteType.DATABASE, {"tool": "search_customers"}
-        if any(kw in q for kw in ("how many", "count", "stats", "statistics")):
+
+        # STATS: counts, totals, breakdowns
+        stats_keywords = (
+            "how many", "count", "stats", "statistics", "total", "totals",
+            "breakdown", "numbers", "per state", "by state", "summary"
+        )
+        if any(kw in q for kw in stats_keywords):
             return RouteType.DATABASE, {"tool": "get_stats"}
+
+        # SEARCH: state, city, location-based, movers
+        search_keywords = (
+            "search", "customers in", "state", "moved", "movers", "relocated",
+            "residents", "living in", "from", "show", "list", "give me",
+            "find people", "who lives", "customers from", "people in",
+            "active", "frequent", "high movers", "relocators"
+        )
+        if any(kw in q for kw in search_keywords):
+            return RouteType.DATABASE, {"tool": "search_customers"}
+
+        # Default: Let Nova handle complex/ambiguous queries
         return RouteType.NOVA, {}
 
     # ==================== Customer Indexing Methods ====================

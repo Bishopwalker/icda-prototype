@@ -134,37 +134,78 @@ Return JSON only."""
             return self._fallback_classify("", rag_docs)
 
     def _fallback_classify(self, query: str, rag_docs: list[str]) -> Classification:
-        """Keyword-based fallback classification."""
+        """Keyword-based fallback classification with flexible matching."""
         q = query.lower()
 
-        # Intent detection
-        if "crid" in q or "look up" in q or "find customer" in q:
+        # Intent detection - more comprehensive keyword matching
+        lookup_patterns = (
+            "crid", "look up", "lookup", "find customer", "get customer",
+            "show me customer", "pull up", "customer record", "customer details",
+            "what is", "who is"
+        )
+        stats_patterns = (
+            "how many", "count", "stats", "statistics", "total", "totals",
+            "per state", "by state", "breakdown", "numbers", "summary"
+        )
+        compare_patterns = (
+            "compare", "vs", "versus", "difference", "between", "comparison"
+        )
+        analysis_patterns = (
+            "trend", "pattern", "analyze", "analysis", "insight", "why",
+            "migration", "movement", "behavior"
+        )
+        recommend_patterns = (
+            "recommend", "suggest", "should", "predict", "forecast", "which customers"
+        )
+        search_patterns = (
+            "search", "find", "show", "list", "give me", "customers in",
+            "people in", "who lives", "residents", "living in", "from",
+            "moved", "movers", "relocated", "high movers", "frequent"
+        )
+
+        # Determine intent with priority order
+        if any(p in q for p in lookup_patterns) and ("crid" in q or any(c.isdigit() for c in q)):
             intent = QueryIntent.LOOKUP
-        elif "how many" in q or "count" in q or "stats" in q or "per state" in q:
+        elif any(p in q for p in stats_patterns):
             intent = QueryIntent.STATS
-        elif "compare" in q or "vs" in q or "versus" in q:
+        elif any(p in q for p in compare_patterns):
             intent = QueryIntent.COMPARISON
-        elif "trend" in q or "pattern" in q or "analyze" in q or "analysis" in q:
+        elif any(p in q for p in analysis_patterns):
             intent = QueryIntent.ANALYSIS
-        elif "recommend" in q or "suggest" in q or "should" in q:
+        elif any(p in q for p in recommend_patterns):
             intent = QueryIntent.RECOMMENDATION
+        elif any(p in q for p in search_patterns):
+            intent = QueryIntent.SEARCH
         else:
+            # Default to search for anything customer-related
             intent = QueryIntent.SEARCH
 
-        # Complexity detection
-        complex_words = ["trend", "pattern", "analyze", "analysis", "recommend", "predict", "insight", "why"]
-        medium_words = ["compare", "filter", "between", "summary", "per state", "who moved", "which"]
+        # Complexity detection - more nuanced
+        complex_words = [
+            "trend", "pattern", "analyze", "analysis", "recommend", "predict",
+            "insight", "why", "forecast", "migration", "behavior"
+        ]
+        medium_words = [
+            "compare", "filter", "between", "summary", "per state", "who moved",
+            "which", "multiple", "several", "all", "most", "least", "top", "bottom"
+        ]
+        simple_words = ["one", "single", "specific", "this", "that"]
+
+        word_count = len(q.split())
 
         if any(w in q for w in complex_words):
             complexity = QueryComplexity.COMPLEX
-        elif any(w in q for w in medium_words) or len(q.split()) > 8:
+        elif any(w in q for w in medium_words) or word_count > 10:
             complexity = QueryComplexity.MEDIUM
-        else:
+        elif any(w in q for w in simple_words) or word_count <= 5:
             complexity = QueryComplexity.SIMPLE
+        else:
+            # Default to medium for moderate-length queries
+            complexity = QueryComplexity.MEDIUM
 
         return Classification(
             intent=intent,
             complexity=complexity,
-            confidence=0.6,
+            confidence=0.65,  # Slightly higher confidence with better matching
             rag_context=rag_docs
         )
