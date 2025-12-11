@@ -23,6 +23,15 @@ from icda.nova import NovaClient
 from icda.router import Router
 from icda.session import SessionManager
 
+# Address verification imports
+from icda.address_index import AddressIndex
+from icda.address_completer import NovaAddressCompleter
+from icda.address_pipeline import AddressPipeline
+from icda.address_router import router as address_router, configure_router
+from icda.agents.orchestrator import AddressAgentOrchestrator
+from icda.indexes.zip_database import ZipDatabase
+from icda.indexes.address_vector_index import AddressVectorIndex
+
 cfg = Config()  # Fresh instance after dotenv loaded
 
 BASE_DIR = Path(__file__).parent
@@ -36,10 +45,20 @@ _nova: NovaClient = None
 _sessions: SessionManager = None
 _router: Router = None
 
+# Address verification globals
+_address_index: AddressIndex = None
+_address_completer: NovaAddressCompleter = None
+_address_pipeline: AddressPipeline = None
+_zip_database: ZipDatabase = None
+_address_vector_index: AddressVectorIndex = None
+_orchestrator: AddressAgentOrchestrator = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _cache, _embedder, _vector_index, _db, _nova, _sessions, _router
+    global _address_index, _address_completer, _address_pipeline
+    global _zip_database, _address_vector_index, _orchestrator
 
     # Startup
     _cache = RedisCache(cfg.cache_ttl)
@@ -58,14 +77,71 @@ async def lifespan(app: FastAPI):
 
     _router = Router(_cache, _vector_index, _db, _nova, _sessions)
 
+    # Initialize address verification components
+    print("Initializing address verification pipeline...")
+
+    # Build address index from customer data
+    _address_index = AddressIndex()
+    _address_index.build_from_customers(_db.customers)
+    print(f"  Address index: {_address_index.total_addresses} addresses")
+
+    # Build ZIP database
+    _zip_database = ZipDatabase()
+    _zip_database.build_from_customers(_db.customers)
+    print(f"  ZIP database: {_zip_database.total_zips} ZIPs")
+
+    # Initialize Nova address completer
+    _address_completer = NovaAddressCompleter(
+        cfg.aws_region,
+        cfg.nova_model,
+        _address_index,
+    )
+
+    # Create pipeline (legacy 6-stage)
+    _address_pipeline = AddressPipeline(
+        _address_index,
+        _address_completer,
+    )
+
+    # Initialize address vector index for semantic search (optional)
+    _address_vector_index = None
+    if cfg.opensearch_host and _embedder.available:
+        _address_vector_index = AddressVectorIndex(_embedder)
+        connected = await _address_vector_index.connect(
+            cfg.opensearch_host,
+            cfg.aws_region,
+        )
+        if connected:
+            print("  Address vector index: connected")
+        else:
+            print("  Address vector index: not available (semantic search disabled)")
+            _address_vector_index = None
+
+    # Initialize 5-agent orchestrator
+    _orchestrator = AddressAgentOrchestrator(
+        address_index=_address_index,
+        zip_database=_zip_database,
+        vector_index=_address_vector_index,
+    )
+    print("  5-agent orchestrator: initialized")
+
+    # Configure address router with both legacy pipeline and new orchestrator
+    configure_router(_address_pipeline, _orchestrator)
+    print("Address verification ready!")
+
     yield
 
     # Shutdown
     await _cache.close()
     await _vector_index.close()
+    if _address_vector_index:
+        await _address_vector_index.close()
 
 
-app = FastAPI(title="ICDA", version="0.5.0", lifespan=lifespan)
+app = FastAPI(title="ICDA", version="0.6.0", lifespan=lifespan)
+
+# Include address verification router
+app.include_router(address_router)
 
 # CORS - allow all origins for development
 app.add_middleware(

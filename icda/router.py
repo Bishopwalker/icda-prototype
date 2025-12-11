@@ -64,9 +64,21 @@ class Router:
                 return self._response(q, response, RouteType.DATABASE, start, tool=tool, session_id=session.session_id)
             route_type = RouteType.NOVA
 
-        # 5. Nova for complex queries - pass conversation history
+        # 5. Nova for complex queries - pass conversation history and RAG context
         history = session.get_history(max_messages=20) if session.messages else None
-        result = await self.nova.query(q, history=history)
+        
+        # RAG Retrieval: Fetch relevant customer context
+        context = None
+        rag_result = await self.vector_index.search_customers_semantic(q, limit=5)
+        if rag_result["success"] and rag_result["count"] > 0:
+            customers = rag_result["data"]
+            context_lines = ["Found relevant customer records:"]
+            for c in customers:
+                # Format each customer record for the LLM
+                context_lines.append(f"- {c['name']} (CRID: {c['crid']}): {c['city']}, {c['state']}, {c['move_count']} moves. Status: {c['status']}")
+            context = "\n".join(context_lines)
+
+        result = await self.nova.query(q, history=history, context=context)
         
         if result["success"]:
             response = result["response"]

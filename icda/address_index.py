@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from typing import Any
 
-from icda.address_models import ParsedAddress, VerificationStatus
+from icda.address_models import ParsedAddress
 from icda.address_normalizer import (
     AddressNormalizer,
     normalize_state,

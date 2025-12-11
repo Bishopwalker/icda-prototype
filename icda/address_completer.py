@@ -20,7 +20,7 @@ from icda.address_models import (
     AddressComponent,
 )
 from icda.address_index import AddressIndex, MatchResult
-from icda.address_normalizer import AddressNormalizer, STATE_ABBREVIATIONS
+from icda.address_normalizer import AddressNormalizer
 
 
 logger = logging.getLogger(__name__)

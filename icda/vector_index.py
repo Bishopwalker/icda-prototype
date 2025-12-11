@@ -74,8 +74,14 @@ class VectorIndex:
         self.region = region
         self.is_serverless = "aoss.amazonaws.com" in host
         try:
+            print(f"Connecting to OpenSearch: {host} ({region})")
             credentials = boto3.Session().get_credentials()
             service = "aoss" if self.is_serverless else "es"
+            
+            # Debugging types
+            # print(f"DEBUG: AsyncHttpConnection type: {type(AsyncHttpConnection)}")
+            # print(f"DEBUG: AWSV4SignerAsyncAuth type: {type(AWSV4SignerAsyncAuth)}")
+            
             self.client = AsyncOpenSearch(
                 hosts=[{"host": host, "port": 443}],
                 http_auth=AWSV4SignerAsyncAuth(credentials, region, service),
@@ -88,9 +94,12 @@ class VectorIndex:
                 await self.client.info()
             self.available = True
             print(f"OpenSearch {'Serverless ' if self.is_serverless else ''}connected: {host}")
+            print("✅ RAG Pipeline: ENABLED (Semantic Search & Context Injection Active)")
             await self._ensure_index()
         except Exception as e:
             print(f"OpenSearch unavailable: {e}")
+            import traceback
+            traceback.print_exc()
 
     async def _ensure_index(self) -> None:
         if not await self.client.indices.exists(index=self.index):

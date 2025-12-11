@@ -40,23 +40,27 @@ QUERY INTERPRETATION:
             print(f"Nova init failed: {e}")
             self.available = False
 
-    def _converse(self, messages: list) -> dict:
+    def _converse(self, messages: list, context: str | None = None) -> dict:
+        system_prompts = [{"text": self._PROMPT}]
+        if context:
+            system_prompts.append({"text": f"\n\nRELEVANT DATA CONTEXT:\n{context}"})
+
         return self.client.converse(
             modelId=self.model,
             messages=messages,
-            system=[{"text": self._PROMPT}],
+            system=system_prompts,
             toolConfig={"tools": self.TOOLS, "toolChoice": {"auto": {}}},
             inferenceConfig={"maxTokens": 4096, "temperature": 0.1}
         )
 
-    async def query(self, text: str, history: list[dict] | None = None) -> dict:
+    async def query(self, text: str, history: list[dict] | None = None, context: str | None = None) -> dict:
         """
-        Query Nova with optional conversation history.
+        Query Nova with optional conversation history and RAG context.
 
         Args:
             text: The user's query
-            history: Previous messages in Bedrock format [{"role": "user/assistant", "content": [{"text": "..."}]}]
-                     IMPORTANT: History must only contain text content, not toolUse blocks!
+            history: Previous messages in Bedrock format
+            context: Retrieved RAG context to augment the query
 
         Returns:
             dict with success, response, and optional tool used
@@ -76,7 +80,7 @@ QUERY INTERPRETATION:
                         messages.append({"role": msg["role"], "content": clean_content})
             messages.append({"role": "user", "content": [{"text": text}]})
 
-            resp = self._converse(messages)
+            resp = self._converse(messages, context=context)
             content = resp["output"]["message"]["content"]
 
             # Handle ALL tool calls in the response
@@ -100,7 +104,7 @@ QUERY INTERPRETATION:
                     {"role": "assistant", "content": content},
                     {"role": "user", "content": tool_results}
                 ]
-                follow = self._converse(follow_messages)
+                follow = self._converse(follow_messages, context=context)
 
                 if out := next((b["text"] for b in follow["output"]["message"]["content"] if "text" in b), None):
                     return {"success": True, "response": out, "tool": ", ".join(tool_names)}

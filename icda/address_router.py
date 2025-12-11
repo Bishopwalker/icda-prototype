@@ -3,6 +3,9 @@
 This module provides the REST API endpoints for the address verification
 pipeline, including single address verification, batch processing,
 and index management.
+
+Now includes the 5-agent architecture endpoints for intelligent
+address inference with context awareness and multi-state support.
 """
 
 import logging
@@ -17,6 +20,8 @@ from icda.address_models import (
 )
 from icda.address_pipeline import AddressPipeline, BatchProcessor
 
+from icda.agents.orchestrator import AddressAgentOrchestrator
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,18 +31,24 @@ router = APIRouter(prefix="/api/address", tags=["Address Verification"])
 # Global reference to pipeline (set during app startup)
 _pipeline: AddressPipeline | None = None
 _batch_processor: BatchProcessor | None = None
+_orchestrator = None  # Will be AddressAgentOrchestrator when implemented
 
 
-def configure_router(pipeline: AddressPipeline) -> None:
+def configure_router(
+    pipeline: AddressPipeline,
+    orchestrator=None,
+) -> None:
     """Configure the router with pipeline dependencies.
 
     Args:
         pipeline: Initialized address verification pipeline.
+        orchestrator: Optional 5-agent orchestrator for intelligent verification.
     """
-    global _pipeline, _batch_processor
+    global _pipeline, _batch_processor, _orchestrator
     _pipeline = pipeline
     _batch_processor = BatchProcessor(pipeline)
-    logger.info("Address router configured")
+    _orchestrator = orchestrator
+    logger.info(f"Address router configured (orchestrator={'enabled' if orchestrator else 'disabled'})")
 
 
 # ============================================================================
@@ -361,6 +372,220 @@ async def health_check() -> dict[str, Any]:
         "status": "healthy" if _pipeline else "not_initialized",
         "pipeline": _pipeline is not None,
         "batch_processor": _batch_processor is not None,
+        "orchestrator": _orchestrator is not None,
         "index_ready": _pipeline.index.is_indexed if _pipeline else False,
         "completer_available": _pipeline.completer.available if _pipeline else False,
     }
+
+
+# ============================================================================
+# Agent-Based Verification (5-Agent Architecture)
+# ============================================================================
+
+
+class AgentVerifyRequest(BaseModel):
+    """Request model for agent-based address verification."""
+
+    address: str = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="Raw address string to verify",
+        examples=["101 turkey", "123 Main St", "456 Oak Ave Las Vegas"],
+    )
+    session_id: str | None = Field(
+        default=None,
+        description="Session ID for conversation context",
+    )
+    session_history: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Conversation history for context extraction",
+    )
+    hints: dict[str, str] | None = Field(
+        default=None,
+        description="Explicit hints like {'state': 'NV', 'city': 'Las Vegas'}",
+    )
+    multi_state: bool = Field(
+        default=True,
+        description="Enable multi-state results when state uncertain",
+    )
+    max_results: int = Field(
+        default=20,
+        ge=1,
+        le=100,
+        description="Maximum matches to return",
+    )
+    include_trace: bool = Field(
+        default=True,
+        description="Include visual pipeline trace in response",
+    )
+
+
+class AgentVerifyResponse(BaseModel):
+    """Response model for agent-based verification."""
+
+    success: bool
+    status: str
+    verified: dict[str, Any] | None
+    confidence: float
+    alternatives: list[dict[str, Any]]
+    multi_state_results: dict[str, list[dict[str, Any]]] | None
+    inferences_made: dict[str, Any]
+    context_used: dict[str, Any]
+    quality_gates: list[dict[str, Any]]
+    processing_time_ms: int
+    agent_timings: dict[str, int]
+    pipeline_trace: dict[str, Any] | None = Field(
+        default=None,
+        description="Visual pipeline trace showing query flow through agents",
+    )
+
+
+class AgentStatsResponse(BaseModel):
+    """Response model for agent statistics."""
+
+    agents: dict[str, Any]
+    indexes: dict[str, Any]
+
+
+@router.post("/verify/agent", response_model=AgentVerifyResponse)
+async def verify_with_agents(request: AgentVerifyRequest) -> AgentVerifyResponse:
+    """Verify address using 5-agent intelligent pipeline.
+
+    This endpoint uses the new agent-based architecture for:
+    - Context extraction from conversation history
+    - Intelligent inference of missing components
+    - Multi-state matching when state is uncertain
+    - Semantic vector search for similar addresses
+    - Quality gate validation
+
+    The 5 agents are:
+    1. Context Agent - Extracts geographic context from history
+    2. Parser Agent - Normalizes and parses the address
+    3. Inference Agent - Infers missing state, city, ZIP
+    4. Match Agent - Finds matches using fuzzy + semantic search
+    5. Enforcer Agent - Validates results with quality gates
+
+    Args:
+        request: Agent verification request with optional context.
+
+    Returns:
+        Comprehensive verification result with inferences, multi-state results, and pipeline trace.
+    """
+    if not _orchestrator:
+        raise HTTPException(
+            status_code=503,
+            detail="Agent orchestrator not initialized. Use /verify for legacy pipeline."
+        )
+
+    result, trace = await _orchestrator.process(
+        raw_address=request.address,
+        session_id=request.session_id,
+        session_history=request.session_history,
+        hints=request.hints,
+        max_results=request.max_results,
+        enable_trace=request.include_trace,
+    )
+
+    # Convert ParsedAddress objects to dicts
+    verified_dict = None
+    if result.verified_address:
+        verified_dict = {
+            "street_number": result.verified_address.street_number,
+            "street_name": result.verified_address.street_name,
+            "street_type": result.verified_address.street_type,
+            "city": result.verified_address.city,
+            "state": result.verified_address.state,
+            "zip_code": result.verified_address.zip_code,
+            "single_line": result.verified_address.single_line,
+        }
+
+    alternatives_list = []
+    for alt in result.alternatives:
+        alternatives_list.append({
+            "street_number": alt.street_number,
+            "street_name": alt.street_name,
+            "street_type": alt.street_type,
+            "city": alt.city,
+            "state": alt.state,
+            "zip_code": alt.zip_code,
+            "single_line": alt.single_line,
+        })
+
+    # Convert multi-state results
+    multi_state_dict = None
+    if result.multi_state_results:
+        multi_state_dict = {}
+        for state, addresses in result.multi_state_results.items():
+            multi_state_dict[state] = [
+                {
+                    "street_number": a.street_number,
+                    "street_name": a.street_name,
+                    "street_type": a.street_type,
+                    "city": a.city,
+                    "state": a.state,
+                    "zip_code": a.zip_code,
+                    "single_line": a.single_line,
+                }
+                for a in addresses
+            ]
+
+    # Convert quality gates
+    quality_gates_list = [
+        {
+            "gate": g.gate.value,
+            "passed": g.passed,
+            "message": g.message,
+            "details": g.details,
+        }
+        for g in result.quality_gates
+    ]
+
+    return AgentVerifyResponse(
+        success=result.status in (
+            VerificationStatus.VERIFIED,
+            VerificationStatus.CORRECTED,
+            VerificationStatus.COMPLETED,
+        ),
+        status=result.status.value,
+        verified=verified_dict,
+        confidence=result.confidence,
+        alternatives=alternatives_list,
+        multi_state_results=multi_state_dict,
+        inferences_made=result.metadata.get("inferences_made", {}),
+        context_used={
+            "confidence": result.metadata.get("context_confidence", 0),
+            "signals": result.metadata.get("context_signals", []),
+        },
+        quality_gates=quality_gates_list,
+        processing_time_ms=result.metadata.get("total_time_ms", 0),
+        agent_timings=result.metadata.get("agent_timings", {}),
+        pipeline_trace=trace.to_dict() if trace else None,
+    )
+
+
+@router.get("/agents/stats", response_model=AgentStatsResponse)
+async def get_agent_stats() -> AgentStatsResponse:
+    """Get statistics for all agents in the pipeline.
+
+    Returns:
+        Agent performance statistics and index information.
+    """
+    if not _orchestrator:
+        raise HTTPException(
+            status_code=503,
+            detail="Agent orchestrator not initialized"
+        )
+
+    stats = _orchestrator.get_agent_stats()
+
+    return AgentStatsResponse(
+        agents={
+            "context": stats.get("context_agent", {}),
+            "parser": stats.get("parser_agent", {}),
+            "inference": stats.get("inference_agent", {}),
+            "match": stats.get("match_agent", {}),
+            "enforcer": stats.get("enforcer_agent", {}),
+        },
+        indexes=stats.get("indexes", {}),
+    )
