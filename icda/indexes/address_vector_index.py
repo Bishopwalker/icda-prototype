@@ -76,18 +76,27 @@ class AddressVectorIndex:
             return False
 
         self.is_serverless = "aoss.amazonaws.com" in host
+        is_aws = "amazonaws.com" in host
 
         try:
-            credentials = boto3.Session().get_credentials()
-            service = "aoss" if self.is_serverless else "es"
+            if is_aws:
+                credentials = boto3.Session().get_credentials()
+                service = "aoss" if self.is_serverless else "es"
 
-            self.client = AsyncOpenSearch(
-                hosts=[{"host": host, "port": 443}],
-                http_auth=AWSV4SignerAsyncAuth(credentials, region, service),
-                use_ssl=True,
-                verify_certs=True,
-                connection_class=AsyncHttpConnection,
-            )
+                self.client = AsyncOpenSearch(
+                    hosts=[{"host": host, "port": 443}],
+                    http_auth=AWSV4SignerAsyncAuth(credentials, region, service),
+                    use_ssl=True,
+                    verify_certs=True,
+                    connection_class=AsyncHttpConnection,
+                )
+            else:
+                self.client = AsyncOpenSearch(
+                    hosts=[host],
+                    use_ssl=False,
+                    verify_certs=False,
+                    connection_class=AsyncHttpConnection,
+                )
 
             # Test connection
             if self.is_serverless:

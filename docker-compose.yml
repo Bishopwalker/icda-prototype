@@ -7,6 +7,11 @@ services:
     container_name: icda
     ports:
       - "8000:8000"
+    volumes:
+      - ./main.py:/app/main.py
+      - ./icda:/app/icda
+      - ./templates:/app/templates
+      - ./frontend/dist:/app/frontend/dist
     environment:
       - AWS_REGION=${AWS_REGION:-us-east-1}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
@@ -14,9 +19,10 @@ services:
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
       - NOVA_MODEL=${NOVA_MODEL:-us.amazon.nova-micro-v1:0}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - OPENSEARCH_HOST=${OPENSEARCH_HOST:-}
+      - OPENSEARCH_HOST=${OPENSEARCH_HOST:-http://opensearch:9200}
     depends_on:
       - redis
+      - opensearch
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
@@ -39,6 +45,27 @@ services:
       retries: 3
     restart: unless-stopped
 
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: icda-opensearch
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - DISABLE_SECURITY_PLUGIN=true 
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9200:9200"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    restart: unless-stopped
+
   # Optional: Frontend dev server (uncomment for development)
   # frontend:
   #   build:
@@ -53,3 +80,4 @@ services:
 
 volumes:
   redis_data:
+  opensearch-data:

@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"],
+      "description": "Up-to-date documentation and code examples for libraries"
+    },
+    "gemini": {
+      "command": "npx",
+      "args": ["-y", "gemini-mcp"],
+      "env": {
+        "GEMINI_API_KEY": "${GEMINI_API_KEY}"
+      },
+      "description": "Google Gemini AI for content generation and analysis"
+    }
+  }
+}

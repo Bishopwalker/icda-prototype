@@ -43,6 +43,16 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr :4173 ^| findstr LISTENING') 
     taskkill /F /PID %%a >nul 2>&1
 )
 
+REM Stop Infrastructure Dependencies
+echo.
+echo [INFO] Stopping Docker infrastructure...
+docker-compose stop redis opensearch
+if %errorlevel%==0 (
+    echo        Docker services stopped.
+) else (
+    echo        [WARNING] Failed to stop Docker services (or they weren't running).
+)
+
 echo.
 echo ============================================================
 echo [SUCCESS] All processes force killed!

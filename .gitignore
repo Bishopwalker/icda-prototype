@@ -1,7 +1,6 @@
 .env
 __pycache__/
 *.pyc
-.claude/
 node_modules/
 .idea/
 *.log
@@ -11,3 +10,15 @@ venv/
 dist/
 build/
 *.egg-info/
+nul
+
+# Claude Code Context - Users must download agents separately
+.claude/agents/
+.claude/mcp-servers/
+.claude/rag/chroma_db/
+.claude/rag/index/
+.claude/.initialized
+.claude/BOOTSTRAP_STATUS.json
+.claude/PROJECT_CONVENTIONS.json
+.claude/CONVENTIONS.md
+.claude/settings.local.json

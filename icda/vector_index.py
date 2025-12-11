@@ -73,20 +73,37 @@ class VectorIndex:
         self.host = host
         self.region = region
         self.is_serverless = "aoss.amazonaws.com" in host
+        
+        # Check if local (non-AWS)
+        is_aws = "amazonaws.com" in host
+
         try:
             print(f"Connecting to OpenSearch: {host} ({region})")
-            credentials = boto3.Session().get_credentials()
-            service = "aoss" if self.is_serverless else "es"
             
-            # Debugging types
-            # print(f"DEBUG: AsyncHttpConnection type: {type(AsyncHttpConnection)}")
-            # print(f"DEBUG: AWSV4SignerAsyncAuth type: {type(AWSV4SignerAsyncAuth)}")
-            
-            self.client = AsyncOpenSearch(
-                hosts=[{"host": host, "port": 443}],
-                http_auth=AWSV4SignerAsyncAuth(credentials, region, service),
-                use_ssl=True, verify_certs=True, connection_class=AsyncHttpConnection
-            )
+            if is_aws:
+                credentials = boto3.Session().get_credentials()
+                service = "aoss" if self.is_serverless else "es"
+                
+                # Debugging types
+                # print(f"DEBUG: AsyncHttpConnection type: {type(AsyncHttpConnection)}")
+                # print(f"DEBUG: AWSV4SignerAsyncAuth type: {type(AWSV4SignerAsyncAuth)}")
+                
+                self.client = AsyncOpenSearch(
+                    hosts=[{"host": host, "port": 443}],
+                    http_auth=AWSV4SignerAsyncAuth(credentials, region, service),
+                    use_ssl=True, verify_certs=True, connection_class=AsyncHttpConnection
+                )
+            else:
+                # Local / Self-hosted connection
+                # Use 127.0.0.1 instead of localhost to avoid resolution issues
+                connection_host = host.replace("localhost", "127.0.0.1")
+                self.client = AsyncOpenSearch(
+                    hosts=[connection_host],
+                    use_ssl=False,
+                    verify_certs=False,
+                    connection_class=AsyncHttpConnection
+                )
+
             # Serverless doesn't support .info(), test with index list instead
             if self.is_serverless:
                 await self.client.indices.get_alias()
