@@ -4,6 +4,16 @@ echo    ICDA Prototype - Stop All Development Servers (FORCE)
 echo ============================================================
 echo.
 
+REM Stop Docker containers
+echo [INFO] Stopping Docker containers (Redis, OpenSearch)...
+docker-compose down >nul 2>&1
+if %errorlevel%==0 (
+    echo        Docker containers stopped.
+) else (
+    echo        No Docker containers running or Docker not available.
+)
+echo.
+
 REM Kill ALL node processes
 echo [INFO] Force killing ALL Node.js processes...
 taskkill /F /IM "node.exe" >nul 2>&1
@@ -48,6 +58,7 @@ echo ============================================================
 echo [SUCCESS] All processes force killed!
 echo ============================================================
 echo.
-echo Ports cleared: 8000, 5173, 4173
+echo Ports cleared: 8000, 5173, 4173, 9200, 6379
+echo Docker containers: stopped
 echo.
 pause

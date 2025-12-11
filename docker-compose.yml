@@ -39,6 +39,26 @@ services:
       retries: 3
     restart: unless-stopped
 
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: icda-opensearch
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Admin123!
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200 | grep -q 'opensearch'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
   # Optional: Frontend dev server (uncomment for development)
   # frontend:
   #   build:
@@ -53,3 +73,4 @@ services:
 
 volumes:
   redis_data:
+  opensearch_data:
