@@ -11,7 +11,8 @@ load_dotenv()  # Must be before importing config
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from icda.config import Config
@@ -279,7 +280,20 @@ async def index_status():
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
+    """Serve React frontend"""
+    frontend_index = BASE_DIR / "frontend" / "dist" / "index.html"
+    if frontend_index.exists():
+        return frontend_index.read_text()
+    # Fallback to legacy template if React build not available
     return (BASE_DIR / "templates/index.html").read_text()
+
+
+# Mount React frontend static files (must be after API routes)
+frontend_dist = BASE_DIR / "frontend" / "dist"
+if frontend_dist.exists():
+    app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="assets")
+    # Serve other static files (favicons, manifest, etc.)
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
 
 
 if __name__ == "__main__":
