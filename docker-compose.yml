@@ -1,8 +1,11 @@
-version: '3.8'
-
 services:
+  # ============================================
+  # ICDA Main Application
+  # ============================================
   icda:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: icda-prototype:latest
     container_name: icda
     ports:
@@ -13,18 +16,26 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
       - NOVA_MODEL=${NOVA_MODEL:-us.amazon.nova-micro-v1:0}
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - OPENSEARCH_HOST=${OPENSEARCH_HOST:-}
+      - REDIS_URL=redis://redis:6379
+      - OPENSEARCH_HOST=http://opensearch:9200
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s
     restart: unless-stopped
+    networks:
+      - icda-network
 
+  # ============================================
+  # Redis Cache
+  # ============================================
   redis:
     image: redis:7-alpine
     container_name: icda-redis
@@ -38,7 +49,12 @@ services:
       timeout: 5s
       retries: 3
     restart: unless-stopped
+    networks:
+      - icda-network
 
+  # ============================================
+  # OpenSearch Vector Store
+  # ============================================
   opensearch:
     image: opensearchproject/opensearch:2.11.0
     container_name: icda-opensearch
@@ -57,20 +73,50 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 60s
     restart: unless-stopped
+    networks:
+      - icda-network
 
-  # Optional: Frontend dev server (uncomment for development)
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile.dev
-  #   ports:
-  #     - "5173:5173"
-  #   volumes:
-  #     - ./frontend/src:/app/src
-  #   environment:
-  #     - VITE_API_URL=http://localhost:8000
+  # ============================================
+  # MCP Server (stdio transport - for Claude CLI)
+  # Start with: docker-compose --profile mcp up -d mcp-server
+  # ============================================
+  mcp-server:
+    build:
+      context: .claude/mcp-servers/unified-dev
+      dockerfile: Dockerfile.unified
+    image: icda-mcp:latest
+    container_name: icda-mcp
+    stdin_open: true
+    tty: true
+    volumes:
+      - mcp_data:/app/data
+      - .:/app/project:ro
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - VECTOR_PROVIDER=chroma
+      - CHROMA_PERSIST_DIR=/app/data/chroma
+      - PROJECT_ROOT=/app/project
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    restart: unless-stopped
+    networks:
+      - icda-network
+    profiles:
+      - mcp
+
+networks:
+  icda-network:
+    driver: bridge
 
 volumes:
   redis_data:
   opensearch_data:
+  mcp_data:
