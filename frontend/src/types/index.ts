@@ -160,3 +160,48 @@ export interface StreetSuggestionResult {
   zip_code: string;
   partial: string;
 }
+
+// Knowledge Base Types
+export interface KnowledgeDocument {
+  doc_id: string;
+  filename: string;
+  category: string;
+  tags: string[];
+  chunk_count: number;
+  indexed_at: string;
+}
+
+export interface KnowledgeStats {
+  available: boolean;
+  total_chunks: number;
+  unique_documents: number;
+  categories: Record<string, number>;
+  tags: Record<string, number>;
+}
+
+export interface KnowledgeUploadResult {
+  success: boolean;
+  doc_id?: string;
+  filename?: string;
+  chunks_indexed?: number;
+  errors?: number;
+  category?: string;
+  tags?: string[];
+  error?: string;
+}
+
+export interface KnowledgeSearchResult {
+  success: boolean;
+  query: string;
+  hits: KnowledgeHit[];
+}
+
+export interface KnowledgeHit {
+  doc_id: string;
+  filename: string;
+  chunk_index: number;
+  text: string;
+  category: string;
+  tags: string[];
+  score: number;
+}

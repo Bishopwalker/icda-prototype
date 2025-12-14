@@ -23,7 +23,7 @@ export function useHealth(pollInterval: number = 30000): UseHealthReturn {
       const data = await api.health();
       setHealth(data);
       setError(null);
-    } catch (err) {
+    } catch {
       setError('Failed to fetch health status');
       setHealth(null);
     }
@@ -33,7 +33,7 @@ export function useHealth(pollInterval: number = 30000): UseHealthReturn {
     try {
       const data = await api.cacheStats();
       setCacheStats(data);
-    } catch (err) {
+    } catch {
       setCacheStats(null);
     }
   }, []);
@@ -42,7 +42,7 @@ export function useHealth(pollInterval: number = 30000): UseHealthReturn {
     try {
       await api.clearCache();
       await refreshCacheStats();
-    } catch (err) {
+    } catch {
       setError('Failed to clear cache');
     }
   }, [refreshCacheStats]);

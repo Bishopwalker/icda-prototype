@@ -10,6 +10,10 @@ import type {
   FileQueryRequest,
   AutocompleteResult,
   SemanticSearchResult,
+  KnowledgeDocument,
+  KnowledgeStats,
+  KnowledgeUploadResult,
+  KnowledgeSearchResult,
 } from '../types';
 
 // API base URL - configurable via environment variable
@@ -189,6 +193,61 @@ export const api = {
       street_number: streetNumber,
       limit,
     });
+    return response.data;
+  },
+
+  // Knowledge Base API
+  knowledgeUpload: async (
+    file: File,
+    tags: string,
+    category: string
+  ): Promise<KnowledgeUploadResult> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('tags', tags);
+    formData.append('category', category);
+
+    const response = await apiClient.post<KnowledgeUploadResult>(
+      '/api/knowledge/upload',
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120000,
+      }
+    );
+    return response.data;
+  },
+
+  knowledgeListDocuments: async (
+    category?: string
+  ): Promise<{ documents: KnowledgeDocument[] }> => {
+    const response = await apiClient.get<{ documents: KnowledgeDocument[] }>(
+      '/api/knowledge/documents',
+      { params: category ? { category } : {} }
+    );
+    return response.data;
+  },
+
+  knowledgeStats: async (): Promise<KnowledgeStats> => {
+    const response = await apiClient.get<KnowledgeStats>('/api/knowledge/stats');
+    return response.data;
+  },
+
+  knowledgeDelete: async (docId: string): Promise<{ deleted: number }> => {
+    const response = await apiClient.delete<{ deleted: number }>(
+      `/api/knowledge/documents/${docId}`
+    );
+    return response.data;
+  },
+
+  knowledgeSearch: async (
+    query: string,
+    options: { limit?: number; tags?: string[]; category?: string } = {}
+  ): Promise<KnowledgeSearchResult> => {
+    const response = await apiClient.post<KnowledgeSearchResult>(
+      '/api/knowledge/search',
+      { query, ...options }
+    );
     return response.data;
   },
 };

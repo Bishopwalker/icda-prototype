@@ -409,23 +409,38 @@ async def upload_knowledge_text(
     )
 
 
+class KnowledgeSearchRequest(BaseModel):
+    query: str
+    limit: int = 5
+    tags: list[str] | None = None
+    category: str | None = None
+
+
+@app.post("/api/knowledge/search")
+async def search_knowledge(req: KnowledgeSearchRequest):
+    """Search the knowledge base."""
+    if not _knowledge or not _knowledge.available:
+        return {"success": False, "hits": [], "error": "Not available"}
+    return await _knowledge.search(query=req.query, limit=req.limit, tags=req.tags, category=req.category)
+
+
 @app.get("/api/knowledge/search")
-async def search_knowledge(
+async def search_knowledge_get(
     q: str,
     limit: int = 5,
     tags: Optional[str] = None,
     category: Optional[str] = None
 ):
-    """Search the knowledge base."""
+    """Search the knowledge base (GET version)."""
     if not _knowledge or not _knowledge.available:
         return {"success": False, "hits": [], "error": "Not available"}
-
     tag_list = [t.strip() for t in (tags or "").split(",") if t.strip()] if tags else None
     return await _knowledge.search(query=q, limit=limit, tags=tag_list, category=category)
 
 
-@app.delete("/api/knowledge/document/{doc_id}")
+@app.delete("/api/knowledge/documents/{doc_id}")
 async def delete_knowledge_document(doc_id: str):
+    """Delete a document from the knowledge base."""
     if not _knowledge or not _knowledge.available:
         return {"success": False, "error": "Not available"}
     result = await _knowledge.delete_document(doc_id)

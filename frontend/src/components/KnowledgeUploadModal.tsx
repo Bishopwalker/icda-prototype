@@ -86,6 +86,8 @@ export const KnowledgeUploadModal: React.FC<KnowledgeUploadModalProps> = ({
       'text/markdown': ['.md'],
       'application/pdf': ['.pdf'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'application/msword': ['.doc'],
+      'application/vnd.oasis.opendocument.text': ['.odt', '.odf'],
       'application/json': ['.json'],
     },
     maxFiles: 1,
@@ -142,7 +144,7 @@ export const KnowledgeUploadModal: React.FC<KnowledgeUploadModalProps> = ({
     try {
       await api.knowledgeDelete(docId);
       loadDocuments();
-    } catch (err) {
+    } catch {
       setError('Failed to delete document');
     }
   };
@@ -229,7 +231,7 @@ export const KnowledgeUploadModal: React.FC<KnowledgeUploadModalProps> = ({
                     {isDragActive ? 'Drop file here' : 'Drag & drop or click to select'}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Supports: .txt, .md, .pdf, .docx, .json (max 10MB)
+                    Supports: .txt, .md, .pdf, .docx, .doc, .odt, .json (max 10MB)
                   </Typography>
                 </>
               )}

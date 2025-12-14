@@ -42,6 +42,10 @@ class DocumentProcessor:
                 content = self._read_pdf(path)
             elif suffix == ".docx":
                 content = self._read_docx(path)
+            elif suffix == ".doc":
+                content = self._read_doc(path)
+            elif suffix in (".odt", ".odf"):
+                content = self._read_odf(path)
             else:
                 content = path.read_text(encoding="utf-8", errors="ignore")
         except Exception as e:
@@ -157,6 +161,50 @@ class DocumentProcessor:
             return "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
         except ImportError:
             print("python-docx not installed - DOCX support disabled")
+            return ""
+
+    def _read_doc(self, path: Path) -> str:
+        """Read legacy .doc files using textract or antiword."""
+        try:
+            import textract
+            text = textract.process(str(path)).decode("utf-8", errors="ignore")
+            return text
+        except ImportError:
+            # Fallback to antiword if available
+            try:
+                import subprocess
+                result = subprocess.run(
+                    ["antiword", str(path)],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                if result.returncode == 0:
+                    return result.stdout
+            except (subprocess.SubprocessError, FileNotFoundError):
+                pass
+            print("textract/antiword not installed - DOC support disabled. Install with: pip install textract")
+            return ""
+        except Exception as e:
+            print(f"Error reading DOC file: {e}")
+            return ""
+
+    def _read_odf(self, path: Path) -> str:
+        """Read OpenDocument Format files (.odt, .odf)."""
+        try:
+            from odf import text as odf_text
+            from odf.opendocument import load
+            doc = load(str(path))
+            paragraphs = doc.getElementsByType(odf_text.P)
+            return "\n\n".join(
+                "".join(node.data for node in p.childNodes if hasattr(node, "data"))
+                for p in paragraphs
+            )
+        except ImportError:
+            print("odfpy not installed - ODF support disabled. Install with: pip install odfpy")
+            return ""
+        except Exception as e:
+            print(f"Error reading ODF file: {e}")
             return ""
 
 
