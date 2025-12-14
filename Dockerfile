@@ -12,9 +12,6 @@ RUN npm run build
 # Production stage
 FROM python:3.11-slim
 
-# Security: Run as non-root user
-RUN groupadd -r icda && useradd -r -g icda icda
-
 WORKDIR /app
 
 # Install system dependencies
@@ -34,12 +31,6 @@ COPY templates/ ./templates/
 
 # Copy built frontend to serve as static files
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
-
-# Set ownership
-RUN chown -R icda:icda /app
-
-# Switch to non-root user
-USER icda
 
 # Environment variables (defaults)
 ENV AWS_REGION=us-east-1 \
