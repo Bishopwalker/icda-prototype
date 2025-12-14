@@ -1,23 +1,18 @@
 """Nova AI-powered address completion and correction.
 
-This module uses AWS Bedrock Nova to intelligently complete partial
-addresses, correct typos, and suggest the most likely full address
-based on context clues like ZIP code, partial street names, etc.
+Supports LITE MODE (no AWS) with fallback to fuzzy matching only.
 """
 
 import json
 import logging
+import os
 import re
 from typing import Any
-
-import boto3
-from botocore.exceptions import ClientError
 
 from icda.address_models import (
     ParsedAddress,
     VerificationResult,
     VerificationStatus,
-    AddressComponent,
 )
 from icda.address_index import AddressIndex, MatchResult
 from icda.address_normalizer import AddressNormalizer
@@ -28,10 +23,8 @@ logger = logging.getLogger(__name__)
 
 class NovaAddressCompleter:
     """Uses Nova AI to complete and correct partial addresses.
-
-    This class handles the intelligent completion of addresses when
-    exact matches aren't found, using context clues and fuzzy matching
-    combined with Nova's reasoning capabilities.
+    
+    Falls back to fuzzy matching if AWS credentials are not available.
     """
 
     _SYSTEM_PROMPT = """You are an address completion assistant. Your task is to analyze partial or incomplete US addresses and determine the most likely complete address.
@@ -104,25 +97,31 @@ Respond with JSON only:
         self.region = region
         self.model_id = model_id
         self.index = address_index
-        self._client = boto3.client("bedrock-runtime", region_name=region)
-        self.available = True
+        self._client = None
+        self.available = False
 
-        logger.info(f"NovaAddressCompleter initialized with model {model_id}")
+        # Check if AWS credentials are configured
+        if not os.environ.get("AWS_ACCESS_KEY_ID") and not os.environ.get("AWS_PROFILE"):
+            logger.info("NovaAddressCompleter: No AWS credentials - using fallback mode")
+            return
+
+        try:
+            import boto3
+            from botocore.exceptions import NoCredentialsError
+            self._client = boto3.client("bedrock-runtime", region_name=region)
+            self.available = True
+            logger.info(f"NovaAddressCompleter initialized with model {model_id}")
+        except NoCredentialsError:
+            logger.info("NovaAddressCompleter: AWS credentials not found - using fallback mode")
+        except Exception as e:
+            logger.warning(f"NovaAddressCompleter init failed: {e} - using fallback mode")
 
     async def complete_address(
         self,
         parsed: ParsedAddress,
         fuzzy_matches: list[MatchResult],
     ) -> VerificationResult:
-        """Use Nova to complete a partial address.
-
-        Args:
-            parsed: Partially parsed address.
-            fuzzy_matches: Candidate matches from fuzzy search.
-
-        Returns:
-            VerificationResult with completed address.
-        """
+        """Use Nova to complete a partial address (or fallback to fuzzy)."""
         if not self.available:
             return self._fallback_completion(parsed, fuzzy_matches)
 
@@ -140,7 +139,6 @@ Respond with JSON only:
             if additional:
                 candidates += "\n" + "\n".join(additional)
 
-        # Build the prompt
         prompt = self._COMPLETION_PROMPT.format(
             input_address=parsed.raw,
             street_number=parsed.street_number or "unknown",
@@ -152,6 +150,7 @@ Respond with JSON only:
         )
 
         try:
+            from botocore.exceptions import ClientError
             response = self._call_nova(prompt)
             return self._parse_completion_response(response, parsed, fuzzy_matches)
         except ClientError as e:
@@ -168,24 +167,11 @@ Respond with JSON only:
         zip_code: str,
         street_number: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Suggest complete street names for a partial input.
-
-        This is the key method for completing "turkey" -> "Turkey Run"
-        within a specific ZIP code.
-
-        Args:
-            partial_street: Partial street name (e.g., "turkey").
-            zip_code: ZIP code for context.
-            street_number: Optional street number.
-
-        Returns:
-            List of suggestions with confidence scores.
-        """
+        """Suggest complete street names for a partial input."""
         # First, try index-based suggestions
         suggestions = self.index.get_street_suggestions(partial_street, zip_code, 10)
 
         if suggestions:
-            # Found matches in index - return them with confidence
             return [
                 {
                     "street_name": s,
@@ -195,14 +181,10 @@ Respond with JSON only:
                 for s in suggestions
             ]
 
-        # No index matches - try Nova for creative completion
+        # No index matches - try Nova for creative completion (if available)
         if self.available:
             try:
-                return await self._nova_street_suggestion(
-                    partial_street,
-                    zip_code,
-                    street_number,
-                )
+                return await self._nova_street_suggestion(partial_street, zip_code, street_number)
             except Exception as e:
                 logger.warning(f"Nova street suggestion failed: {e}")
 
@@ -215,7 +197,6 @@ Respond with JSON only:
         street_number: str | None,
     ) -> list[dict[str, Any]]:
         """Use Nova to suggest street completions."""
-        # Get all streets in this ZIP for context
         zip_addresses = self.index.lookup_by_zip(zip_code)
         streets = set()
         for addr in zip_addresses:
@@ -261,6 +242,9 @@ Respond with JSON:
 
     def _call_nova(self, prompt: str) -> str:
         """Make a call to Nova API."""
+        if not self._client:
+            return ""
+            
         response = self._client.converse(
             modelId=self.model_id,
             messages=[{"role": "user", "content": [{"text": prompt}]}],
@@ -280,7 +264,7 @@ Respond with JSON:
             return "No candidates available"
 
         lines = []
-        for m in matches[:10]:  # Limit to top 10
+        for m in matches[:10]:
             addr = m.address.parsed
             lines.append(f"- {addr.single_line} (score: {m.score:.2f})")
         return "\n".join(lines)
@@ -295,7 +279,6 @@ Respond with JSON:
         data = self._extract_json(response)
 
         if not data or not data.get("matched"):
-            # Nova couldn't find a good match
             return VerificationResult(
                 status=VerificationStatus.UNVERIFIED,
                 original=original,
@@ -306,7 +289,6 @@ Respond with JSON:
                 },
             )
 
-        # Extract completed address
         completed_data = data.get("completed_address", {})
         completed = ParsedAddress(
             raw=original.raw,
@@ -318,7 +300,6 @@ Respond with JSON:
             zip_code=completed_data.get("zip_code"),
         )
 
-        # Determine status based on what was completed
         confidence = data.get("confidence", 0.5)
         if confidence >= 0.9:
             status = VerificationStatus.COMPLETED
@@ -327,7 +308,6 @@ Respond with JSON:
         else:
             status = VerificationStatus.SUGGESTED
 
-        # Extract alternatives
         alternatives = []
         for alt in data.get("alternatives", []):
             if isinstance(alt, dict) and "address" in alt:
@@ -358,13 +338,11 @@ Respond with JSON:
                 status=VerificationStatus.UNVERIFIED,
                 original=parsed,
                 confidence=0.0,
-                metadata={"reason": "No candidates available"},
+                metadata={"reason": "No candidates available", "fallback": True},
             )
 
-        # Use best fuzzy match
         best = fuzzy_matches[0]
 
-        # Determine status based on score
         if best.score >= 0.95:
             status = VerificationStatus.VERIFIED
         elif best.score >= 0.8:
@@ -391,7 +369,6 @@ Respond with JSON:
 
     def _extract_json(self, text: str) -> dict[str, Any] | None:
         """Extract JSON from Nova response text."""
-        # Try to find JSON block
         json_match = re.search(r"\{[\s\S]*\}", text)
         if json_match:
             try:
@@ -399,7 +376,6 @@ Respond with JSON:
             except json.JSONDecodeError:
                 pass
 
-        # Try parsing entire response
         try:
             return json.loads(text)
         except json.JSONDecodeError:

@@ -1,10 +1,16 @@
+import os
+
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, NoCredentialsError
 
 from .database import CustomerDB
 
 
 class NovaClient:
+    """
+    Amazon Bedrock Nova client for AI-powered queries.
+    Gracefully handles missing AWS credentials.
+    """
     __slots__ = ("client", "model", "available", "db")
 
     _PROMPT = """You are ICDA, a customer data assistant. Be concise and helpful.
@@ -33,12 +39,22 @@ QUERY INTERPRETATION:
     def __init__(self, region: str, model: str, db: CustomerDB):
         self.model = model
         self.db = db
+        self.client = None
+        self.available = False
+
+        # Check if AWS credentials are configured
+        if not os.environ.get("AWS_ACCESS_KEY_ID") and not os.environ.get("AWS_PROFILE"):
+            print("Nova: No AWS credentials - AI features disabled (LITE MODE)")
+            return
+
         try:
             self.client = boto3.client("bedrock-runtime", region_name=region)
             self.available = True
+            print(f"Nova: Connected ({model})")
+        except NoCredentialsError:
+            print("Nova: AWS credentials not found - AI features disabled")
         except Exception as e:
-            print(f"Nova init failed: {e}")
-            self.available = False
+            print(f"Nova: Init failed - {e}")
 
     def _converse(self, messages: list, context: str | None = None) -> dict:
         system_prompts = [{"text": self._PROMPT}]
@@ -66,7 +82,10 @@ QUERY INTERPRETATION:
             dict with success, response, and optional tool used
         """
         if not self.available:
-            return {"success": False, "error": "Nova not available"}
+            return {
+                "success": False, 
+                "error": "AI features not available (no AWS credentials). Running in LITE MODE - use /api/search or /api/autocomplete endpoints."
+            }
 
         try:
             # Build messages: history + current query
@@ -114,7 +133,11 @@ QUERY INTERPRETATION:
             return {"success": False, "error": "No response"}
 
         except ClientError as e:
-            return {"success": False, "error": f"Nova: {e.response['Error']['Message']}"}
+            error_msg = e.response.get("Error", {}).get("Message", str(e))
+            if "Access" in error_msg or "credentials" in error_msg.lower():
+                self.available = False
+                return {"success": False, "error": "AWS access denied - check IAM permissions"}
+            return {"success": False, "error": f"Nova: {error_msg}"}
         except Exception as e:
             return {"success": False, "error": str(e)}
 

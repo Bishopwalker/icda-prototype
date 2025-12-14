@@ -2,13 +2,14 @@
 Knowledge Document Indexing for ICDA RAG
 ========================================
 
-Handles document upload, chunking, embedding, and indexing into OpenSearch.
-Reuses the existing Titan embeddings and OpenSearch infrastructure.
+Supports two modes:
+1. OpenSearch mode - Full vector search (when OpenSearch available)
+2. Memory mode - Simple keyword search fallback (no dependencies)
 
 Usage:
-    knowledge = KnowledgeManager(embedder, vector_index)
-    result = await knowledge.index_document(file_path, tags=["api", "design"])
-    results = await knowledge.search("how does address verification work")
+    knowledge = KnowledgeManager(embedder, opensearch_client)
+    # OR for lite mode:
+    knowledge = KnowledgeManager(embedder, None)  # Uses in-memory fallback
 """
 
 import hashlib
@@ -24,7 +25,7 @@ from .embeddings import EmbeddingClient
 class DocumentProcessor:
     """Extract and chunk content from various file formats."""
 
-    CHUNK_SIZE = 512  # tokens (approximate)
+    CHUNK_SIZE = 512
     CHUNK_OVERLAP = 50
 
     def process_file(self, path: Path) -> list[dict]:
@@ -32,9 +33,7 @@ class DocumentProcessor:
         suffix = path.suffix.lower()
 
         try:
-            if suffix == ".txt":
-                content = path.read_text(encoding="utf-8", errors="ignore")
-            elif suffix == ".md":
+            if suffix in (".txt", ".md"):
                 content = path.read_text(encoding="utf-8", errors="ignore")
             elif suffix == ".json":
                 data = json.loads(path.read_text(encoding="utf-8"))
@@ -44,7 +43,6 @@ class DocumentProcessor:
             elif suffix == ".docx":
                 content = self._read_docx(path)
             else:
-                # Try as plain text
                 content = path.read_text(encoding="utf-8", errors="ignore")
         except Exception as e:
             print(f"Error reading {path}: {e}")
@@ -75,16 +73,14 @@ class DocumentProcessor:
             if not para:
                 continue
 
-            para_size = len(para.split())  # Rough token estimate
+            para_size = len(para.split())
 
             if para_size > self.CHUNK_SIZE:
-                # Flush current
                 if current_chunk:
                     chunks.append(self._make_chunk(current_chunk, source_name, len(chunks)))
                     current_chunk = []
                     current_size = 0
 
-                # Split large paragraph by sentences
                 sentences = re.split(r'(?<=[.!?])\s+', para)
                 for sent in sentences:
                     sent_size = len(sent.split())
@@ -98,7 +94,6 @@ class DocumentProcessor:
 
             elif current_size + para_size > self.CHUNK_SIZE:
                 chunks.append(self._make_chunk(current_chunk, source_name, len(chunks)))
-                # Overlap: keep last item
                 current_chunk = [current_chunk[-1], para] if current_chunk else [para]
                 current_size = sum(len(p.split()) for p in current_chunk)
             else:
@@ -152,7 +147,7 @@ class DocumentProcessor:
             reader = PdfReader(path)
             return "\n\n".join(p.extract_text() or "" for p in reader.pages)
         except ImportError:
-            print("pypdf not installed")
+            print("pypdf not installed - PDF support disabled")
             return ""
 
     def _read_docx(self, path: Path) -> str:
@@ -161,24 +156,114 @@ class DocumentProcessor:
             doc = Document(path)
             return "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
         except ImportError:
-            print("python-docx not installed")
+            print("python-docx not installed - DOCX support disabled")
             return ""
+
+
+class InMemoryKnowledgeStore:
+    """Simple in-memory knowledge store for lite mode (no OpenSearch)."""
+
+    def __init__(self):
+        self.documents: dict[str, dict] = {}  # doc_id -> doc_info
+        self.chunks: list[dict] = []  # All chunks with metadata
+
+    def add_document(self, doc_id: str, filename: str, chunks: list[dict],
+                     tags: list[str], category: str) -> int:
+        """Add a document and its chunks."""
+        now = datetime.utcnow().isoformat()
+
+        # Remove existing doc if re-uploading
+        self.delete_document(doc_id)
+
+        self.documents[doc_id] = {
+            "doc_id": doc_id,
+            "filename": filename,
+            "tags": tags,
+            "category": category,
+            "indexed_at": now,
+            "chunk_count": len(chunks)
+        }
+
+        for i, chunk in enumerate(chunks):
+            self.chunks.append({
+                "doc_id": doc_id,
+                "chunk_id": f"{doc_id}_chunk_{i}",
+                "filename": filename,
+                "chunk_index": i,
+                "text": chunk["text"],
+                "tags": tags,
+                "category": category,
+                "indexed_at": now
+            })
+
+        return len(chunks)
+
+    def delete_document(self, doc_id: str) -> int:
+        """Delete a document and its chunks."""
+        if doc_id in self.documents:
+            del self.documents[doc_id]
+            before = len(self.chunks)
+            self.chunks = [c for c in self.chunks if c["doc_id"] != doc_id]
+            return before - len(self.chunks)
+        return 0
+
+    def search(self, query: str, limit: int = 5, tags: list[str] = None,
+               category: str = None) -> list[dict]:
+        """Simple keyword search over chunks."""
+        query_terms = set(query.lower().split())
+
+        results = []
+        for chunk in self.chunks:
+            # Filter by tags/category
+            if tags and not any(t in chunk["tags"] for t in tags):
+                continue
+            if category and chunk["category"] != category:
+                continue
+
+            # Score by keyword overlap
+            chunk_terms = set(chunk["text"].lower().split())
+            overlap = len(query_terms & chunk_terms)
+            if overlap > 0:
+                results.append({
+                    **chunk,
+                    "score": overlap / len(query_terms)
+                })
+
+        results.sort(key=lambda x: x["score"], reverse=True)
+        return results[:limit]
+
+    def list_documents(self, category: str = None, limit: int = 50) -> list[dict]:
+        """List all documents."""
+        docs = list(self.documents.values())
+        if category:
+            docs = [d for d in docs if d["category"] == category]
+        return docs[:limit]
+
+    def get_stats(self) -> dict:
+        """Get store statistics."""
+        categories = {}
+        tags = {}
+        for chunk in self.chunks:
+            cat = chunk["category"]
+            categories[cat] = categories.get(cat, 0) + 1
+            for tag in chunk["tags"]:
+                tags[tag] = tags.get(tag, 0) + 1
+
+        return {
+            "available": True,
+            "backend": "memory",
+            "total_chunks": len(self.chunks),
+            "unique_documents": len(self.documents),
+            "categories": categories,
+            "tags": tags
+        }
 
 
 class KnowledgeManager:
     """
-    Manages RAG knowledge documents in OpenSearch.
-
-    Index schema (icda-knowledge):
-      - doc_id: unique document identifier
-      - chunk_id: unique chunk identifier
-      - filename: original filename
-      - chunk_index: position in document
-      - text: chunk content
-      - embedding: Titan 1024-dim vector
-      - tags: list of tags
-      - category: document category
-      - indexed_at: timestamp
+    Manages RAG knowledge documents.
+    
+    Automatically falls back to in-memory storage if OpenSearch is unavailable.
     """
 
     INDEX_NAME = "icda-knowledge"
@@ -210,23 +295,32 @@ class KnowledgeManager:
 
     def __init__(self, embedder: EmbeddingClient, opensearch_client):
         self.embedder = embedder
-        self.client = opensearch_client  # AsyncOpenSearch from vector_index
+        self.client = opensearch_client
         self.processor = DocumentProcessor()
         self.available = False
+        self.use_opensearch = False
+
+        # In-memory fallback
+        self._memory_store = InMemoryKnowledgeStore()
 
     async def ensure_index(self) -> bool:
-        """Create knowledge index if it doesn't exist."""
-        if not self.client:
-            return False
-        try:
-            if not await self.client.indices.exists(index=self.INDEX_NAME):
-                await self.client.indices.create(index=self.INDEX_NAME, body=self.INDEX_MAPPING)
-                print(f"Created knowledge index: {self.INDEX_NAME}")
-            self.available = True
-            return True
-        except Exception as e:
-            print(f"Failed to create knowledge index: {e}")
-            return False
+        """Initialize knowledge storage (OpenSearch or memory fallback)."""
+        if self.client:
+            try:
+                if not await self.client.indices.exists(index=self.INDEX_NAME):
+                    await self.client.indices.create(index=self.INDEX_NAME, body=self.INDEX_MAPPING)
+                    print(f"Created knowledge index: {self.INDEX_NAME}")
+                self.available = True
+                self.use_opensearch = True
+                return True
+            except Exception as e:
+                print(f"OpenSearch knowledge index failed: {e}")
+
+        # Fallback to memory
+        print("Knowledge base: Using in-memory storage (no OpenSearch)")
+        self.available = True
+        self.use_opensearch = False
+        return True
 
     async def index_document(
         self,
@@ -235,18 +329,7 @@ class KnowledgeManager:
         tags: list[str] = None,
         category: str = "general"
     ) -> dict:
-        """
-        Index a document into the knowledge base.
-
-        Args:
-            content: File path or raw text content
-            filename: Display name (required if content is text)
-            tags: List of tags for filtering
-            category: Category (e.g., "api", "architecture", "meeting-notes")
-
-        Returns:
-            {"success": bool, "doc_id": str, "chunks_indexed": int}
-        """
+        """Index a document into the knowledge base."""
         if not self.available:
             return {"success": False, "error": "Knowledge index not available"}
 
@@ -263,27 +346,41 @@ class KnowledgeManager:
         if not chunks:
             return {"success": False, "error": "No content extracted"}
 
-        # Generate doc_id from content hash
+        # Generate doc_id
         content_hash = hashlib.sha256(
             "".join(c["text"] for c in chunks).encode()
         ).hexdigest()[:12]
         doc_id = f"{Path(filename).stem}_{content_hash}"
 
-        # Delete existing (for re-uploads)
+        # Delete existing
         await self.delete_document(doc_id)
 
-        # Index chunks
+        # Use OpenSearch or memory
+        if self.use_opensearch:
+            return await self._index_opensearch(doc_id, filename, chunks, tags or [], category)
+        else:
+            indexed = self._memory_store.add_document(doc_id, filename, chunks, tags or [], category)
+            return {
+                "success": True,
+                "doc_id": doc_id,
+                "filename": filename,
+                "chunks_indexed": indexed,
+                "errors": 0,
+                "category": category,
+                "tags": tags or [],
+                "backend": "memory"
+            }
+
+    async def _index_opensearch(self, doc_id: str, filename: str, chunks: list[dict],
+                                  tags: list[str], category: str) -> dict:
+        """Index into OpenSearch with embeddings."""
         indexed = 0
         errors = 0
         now = datetime.utcnow().isoformat()
 
         for i, chunk in enumerate(chunks):
             chunk_id = f"{doc_id}_chunk_{i}"
-            embedding = self.embedder.embed(chunk["text"])
-
-            if not embedding:
-                errors += 1
-                continue
+            embedding = self.embedder.embed(chunk["text"]) if self.embedder else None
 
             doc = {
                 "doc_id": doc_id,
@@ -291,11 +388,13 @@ class KnowledgeManager:
                 "filename": filename,
                 "chunk_index": i,
                 "text": chunk["text"],
-                "tags": tags or [],
+                "tags": tags,
                 "category": category,
                 "indexed_at": now,
-                "embedding": embedding
             }
+
+            if embedding:
+                doc["embedding"] = embedding
 
             try:
                 await self.client.index(index=self.INDEX_NAME, id=chunk_id, body=doc)
@@ -313,45 +412,60 @@ class KnowledgeManager:
             "chunks_indexed": indexed,
             "errors": errors,
             "category": category,
-            "tags": tags or []
+            "tags": tags,
+            "backend": "opensearch"
         }
 
-    async def search(
-        self,
-        query: str,
-        limit: int = 5,
-        tags: list[str] = None,
-        category: str = None
-    ) -> dict:
-        """Semantic search over knowledge base."""
+    async def search(self, query: str, limit: int = 5, tags: list[str] = None,
+                     category: str = None) -> dict:
+        """Search the knowledge base."""
         if not self.available:
             return {"success": False, "hits": [], "error": "Not available"}
 
-        embedding = self.embedder.embed(query)
-        if not embedding:
-            return {"success": False, "hits": [], "error": "Embedding failed"}
+        if self.use_opensearch:
+            return await self._search_opensearch(query, limit, tags, category)
+        else:
+            hits = self._memory_store.search(query, limit, tags, category)
+            return {"success": True, "query": query, "hits": hits, "backend": "memory"}
 
-        # Build filter
+    async def _search_opensearch(self, query: str, limit: int, tags: list[str],
+                                   category: str) -> dict:
+        """Search OpenSearch with semantic similarity."""
+        embedding = self.embedder.embed(query) if self.embedder else None
+
         filters = []
         if tags:
             filters.append({"terms": {"tags": tags}})
         if category:
             filters.append({"term": {"category": category}})
 
-        if filters:
+        # Build query - semantic if embedding available, else text match
+        if embedding:
+            if filters:
+                search_body = {
+                    "size": limit,
+                    "query": {
+                        "bool": {
+                            "filter": filters,
+                            "must": [{"knn": {"embedding": {"vector": embedding, "k": limit * 2}}}]
+                        }
+                    }
+                }
+            else:
+                search_body = {
+                    "size": limit,
+                    "query": {"knn": {"embedding": {"vector": embedding, "k": limit}}}
+                }
+        else:
+            # Text-only fallback
             search_body = {
                 "size": limit,
                 "query": {
                     "bool": {
-                        "filter": filters,
-                        "must": [{"knn": {"embedding": {"vector": embedding, "k": limit * 2}}}]
+                        "must": [{"match": {"text": query}}],
+                        "filter": filters if filters else None
                     }
                 }
-            }
-        else:
-            search_body = {
-                "size": limit,
-                "query": {"knn": {"embedding": {"vector": embedding, "k": limit}}}
             }
 
         try:
@@ -368,14 +482,17 @@ class KnowledgeManager:
                     "tags": src["tags"],
                     "score": round(hit["_score"], 4)
                 })
-            return {"success": True, "query": query, "hits": hits}
+            return {"success": True, "query": query, "hits": hits, "backend": "opensearch"}
         except Exception as e:
             return {"success": False, "hits": [], "error": str(e)}
 
     async def list_documents(self, category: str = None, limit: int = 50) -> list[dict]:
-        """List unique documents in the knowledge base."""
+        """List documents in the knowledge base."""
         if not self.available:
             return []
+
+        if not self.use_opensearch:
+            return self._memory_store.list_documents(category, limit)
 
         agg_body: dict = {
             "size": 0,
@@ -417,9 +534,13 @@ class KnowledgeManager:
             return []
 
     async def delete_document(self, doc_id: str) -> dict:
-        """Delete all chunks for a document."""
+        """Delete a document."""
         if not self.available:
             return {"deleted": 0}
+
+        if not self.use_opensearch:
+            deleted = self._memory_store.delete_document(doc_id)
+            return {"deleted": deleted}
 
         try:
             resp = await self.client.delete_by_query(
@@ -434,6 +555,9 @@ class KnowledgeManager:
         """Get knowledge base statistics."""
         if not self.available:
             return {"available": False}
+
+        if not self.use_opensearch:
+            return self._memory_store.get_stats()
 
         try:
             count = await self.client.count(index=self.INDEX_NAME)
@@ -452,6 +576,7 @@ class KnowledgeManager:
 
             return {
                 "available": True,
+                "backend": "opensearch",
                 "total_chunks": count["count"],
                 "unique_documents": int(agg_resp["aggregations"]["unique_docs"]["value"]),
                 "categories": {
@@ -464,4 +589,4 @@ class KnowledgeManager:
                 }
             }
         except Exception as e:
-            return {"available": True, "error": str(e)}
+            return {"available": True, "backend": "opensearch", "error": str(e)}

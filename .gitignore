@@ -1,26 +1,30 @@
+6# Environment files (contain secrets)
 .env
+.env.*
+!.env.example
+
+# Python
 __pycache__/
 *.pyc
-node_modules/
-.idea/
-*.log
-.DS_Store
 venv/
 .venv/
+*.egg-info/
+
+# Node
+node_modules/
 dist/
 build/
-*.egg-info/
-nul
 
-# Claude Code Context - Users must download agents separately
+# IDE
+.idea/
+.vscode/
+*.log
+.DS_Store
+
+# Claude Code
 .claude/agents/
 .claude/mcp-servers/
-.claude/rag/chroma_db/
-.claude/rag/index/
+.claude/rag/
 .claude/.initialized
-.claude/BOOTSTRAP_STATUS.json
-.claude/PROJECT_CONVENTIONS.json
+.claude/*.json
 .claude/CONVENTIONS.md
-.claude/settings.local.json
-.env.docker
-.env.local
