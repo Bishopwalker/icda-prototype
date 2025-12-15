@@ -40,7 +40,7 @@ def main():
         r = httpx.get(f"{BASE}/api/health")
         h = r.json()
         print(f"✓ Server running | Bedrock: {h['bedrock_available']} | Demo: {h['demo_mode']}")
-    except:
+    except Exception:
         print("✗ Server not running. Start it first!")
         return
     

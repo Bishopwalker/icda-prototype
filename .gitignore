@@ -1,9 +1,4 @@
-6# Environment files (contain secrets)
 .env
-.env.*
-!.env.example
-
-# Python
 __pycache__/
 *.pyc
 venv/
@@ -28,3 +23,9 @@ build/
 .claude/.initialized
 .claude/*.json
 .claude/CONVENTIONS.md
+# Windows reserved names (causes git errors)
+nul
+
+# OS
+.DS_Store
+Thumbs.db
