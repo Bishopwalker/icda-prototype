@@ -41,6 +41,7 @@ AWS_SECRET_ACCESS_KEY=your_secret
 AWS_REGION=us-east-1
 ```
 
+<<<<<<< HEAD
 ## Optional: Redis & OpenSearch
 
 For production deployments, you can add:
@@ -54,6 +55,37 @@ docker-compose up -d redis opensearch
 
 Then update `.env`:
 ```env
+=======
+## Docker Deployment
+
+### Option 1: Core Services Only (Redis + OpenSearch)
+```bash
+docker-compose up -d redis opensearch
+```
+Then run the app locally with `run.bat` or `run.sh`.
+
+### Option 2: Full Stack (Everything in Docker)
+```bash
+docker-compose up -d
+```
+This starts: ICDA app + Redis + OpenSearch
+
+### Option 3: With MCP Servers (for Claude Code integration)
+```bash
+docker-compose --profile mcp up -d
+```
+This adds: MCP server + MCP Knowledge server (RAG for internal docs)
+
+### Environment Variables
+Create `.env` file:
+```env
+# AWS (required for AI features)
+AWS_ACCESS_KEY_ID=your_key
+AWS_SECRET_ACCESS_KEY=your_secret
+AWS_REGION=us-east-1
+
+# Services (auto-configured in Docker)
+>>>>>>> 04ca1a3554d0e96a498278e69485ff09f1595add
 REDIS_URL=redis://localhost:6379
 OPENSEARCH_HOST=http://localhost:9200
 ```
@@ -89,6 +121,7 @@ icda-prototype/
 
 ## Adding Knowledge Documents
 
+<<<<<<< HEAD
 1. Add `.md` files to `knowledge/` folder
 2. Register in `main.py`:
 ```python
@@ -97,6 +130,33 @@ KNOWLEDGE_DOCUMENTS = [
 ]
 ```
 3. Restart - auto-indexed on startup
+=======
+Just drop files into the `knowledge/` folder - they auto-index on startup!
+
+```
+knowledge/
+├── address-standards/     # Category = "address-standards"
+│   └── your-doc.md
+├── examples/              # Category = "examples"
+│   └── test-cases.md
+└── any-file.md            # Category = "general"
+```
+
+**Supported formats:** `.md`, `.txt`, `.json`
+
+**Auto-tagging:** Add YAML frontmatter for custom tags:
+```yaml
+---
+tags: [puerto-rico, validation, testing]
+---
+# Your Document Title
+```
+
+**Or just name files descriptively** - tags auto-inferred from filename:
+- `pr-address-examples.md` → tags: `puerto-rico`, `addressing`, `examples`
+
+**Re-index manually:** `POST /api/knowledge/reindex`
+>>>>>>> 04ca1a3554d0e96a498278e69485ff09f1595add
 
 ## License
 

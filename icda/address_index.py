@@ -45,8 +45,22 @@ class IndexedAddress:
             self.normalized_key = self._compute_key()
 
     def _compute_key(self) -> str:
+<<<<<<< HEAD
         """Compute normalized lookup key."""
         parts = []
+=======
+        """Compute normalized lookup key.
+
+        For Puerto Rico addresses, includes urbanization as part of the key
+        since the same street/number/ZIP can exist in multiple urbanizations.
+        """
+        parts = []
+
+        # For PR addresses, include urbanization first (important disambiguator)
+        if self.parsed.is_puerto_rico and self.parsed.urbanization:
+            parts.append(self.parsed.urbanization.lower())
+
+>>>>>>> 04ca1a3554d0e96a498278e69485ff09f1595add
         if self.parsed.street_number:
             parts.append(self.parsed.street_number.lower())
         if self.parsed.street_name:
@@ -98,6 +112,12 @@ class AddressIndex:
         self._by_city_state: dict[str, list[IndexedAddress]] = defaultdict(list)
         self._by_street_name: dict[str, list[IndexedAddress]] = defaultdict(list)
 
+<<<<<<< HEAD
+=======
+        # Puerto Rico urbanization index: urbanization_name -> list of IndexedAddress
+        self._by_urbanization: dict[str, list[IndexedAddress]] = defaultdict(list)
+
+>>>>>>> 04ca1a3554d0e96a498278e69485ff09f1595add
         # Street name variations within ZIP codes
         # zip -> {normalized_street_name -> [full street names]}
         self._street_variants: dict[str, dict[str, set[str]]] = defaultdict(
@@ -153,11 +173,19 @@ class AddressIndex:
         return count
 
     def _extract_address(self, customer: dict[str, Any]) -> ParsedAddress | None:
+<<<<<<< HEAD
         """Extract ParsedAddress from customer record."""
+=======
+        """Extract ParsedAddress from customer record.
+
+        Uses AddressNormalizer for full parsing including PR urbanization detection.
+        """
+>>>>>>> 04ca1a3554d0e96a498278e69485ff09f1595add
         address = customer.get("address")
         if not address:
             return None
 
+<<<<<<< HEAD
         return ParsedAddress(
             raw=f"{address}, {customer.get('city', '')}, {customer.get('state', '')} {customer.get('zip', '')}",
             street_number=self._extract_street_number(address),
@@ -167,6 +195,29 @@ class AddressIndex:
             state=customer.get("state"),
             zip_code=customer.get("zip"),
         )
+=======
+        # Build full address string for normalizer
+        full_address = f"{address}, {customer.get('city', '')}, {customer.get('state', '')} {customer.get('zip', '')}"
+
+        # Use normalizer for full parsing (handles PR urbanization, etc.)
+        parsed = AddressNormalizer.normalize(full_address)
+
+        # If normalizer didn't extract fields, fall back to manual extraction
+        if not parsed.street_number:
+            parsed.street_number = self._extract_street_number(address)
+        if not parsed.street_name:
+            parsed.street_name = self._extract_street_name(address)
+        if not parsed.street_type:
+            parsed.street_type = self._extract_street_type(address)
+        if not parsed.city:
+            parsed.city = customer.get("city")
+        if not parsed.state:
+            parsed.state = customer.get("state")
+        if not parsed.zip_code:
+            parsed.zip_code = customer.get("zip")
+
+        return parsed
+>>>>>>> 04ca1a3554d0e96a498278e69485ff09f1595add
 
     def _extract_move_address(
         self,
@@ -259,6 +310,14 @@ class AddressIndex:
             normalized = self._normalize_street_name(parsed.street_name)
             self._by_street_name[normalized].append(indexed)
 
+<<<<<<< HEAD
+=======
+        # Puerto Rico urbanization index
+        if parsed.is_puerto_rico and parsed.urbanization:
+            urb_key = parsed.urbanization.lower()
+            self._by_urbanization[urb_key].append(indexed)
+
+>>>>>>> 04ca1a3554d0e96a498278e69485ff09f1595add
     def _normalize_street_name(self, name: str) -> str:
         """Normalize street name for fuzzy matching."""
         name = name.lower()
@@ -301,6 +360,35 @@ class AddressIndex:
         """
         return self._by_zip.get(zip_code, [])
 
+<<<<<<< HEAD
+=======
+    def lookup_by_urbanization(
+        self,
+        urbanization: str,
+        zip_code: str | None = None,
+    ) -> list[IndexedAddress]:
+        """Look up addresses by Puerto Rico urbanization name.
+
+        Urbanization is a required field for PR addresses that identifies
+        the specific subdivision within a ZIP code.
+
+        Args:
+            urbanization: Urbanization name (case-insensitive).
+            zip_code: Optional ZIP code to narrow search.
+
+        Returns:
+            List of addresses in that urbanization.
+        """
+        urb_key = urbanization.lower()
+        results = self._by_urbanization.get(urb_key, [])
+
+        # If ZIP provided, filter results
+        if zip_code:
+            results = [r for r in results if r.parsed.zip_code == zip_code]
+
+        return results
+
+>>>>>>> 04ca1a3554d0e96a498278e69485ff09f1595add
     def lookup_street_in_zip(
         self,
         partial_street: str,

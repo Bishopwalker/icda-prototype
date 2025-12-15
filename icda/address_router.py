@@ -84,6 +84,22 @@ class AddressVerifyResponse(BaseModel):
     alternatives: list[dict[str, Any]]
     processing_time_ms: int
     metadata: dict[str, Any]
+<<<<<<< HEAD
+=======
+    # Puerto Rico specific fields
+    is_puerto_rico: bool = Field(
+        default=False,
+        description="True if address is Puerto Rico (ZIP 006-009)",
+    )
+    urbanization: str | None = Field(
+        default=None,
+        description="Puerto Rico urbanization name (URB) if applicable",
+    )
+    pr_warnings: list[str] = Field(
+        default_factory=list,
+        description="Puerto Rico-specific warnings (e.g., missing urbanization)",
+    )
+>>>>>>> 04ca1a3554d0e96a498278e69485ff09f1595add
 
 
 class BatchVerifyRequest(BaseModel):
@@ -209,6 +225,16 @@ async def verify_address(request: AddressVerifyRequest) -> AddressVerifyResponse
 
     result = await _pipeline.verify(request.address)
 
+<<<<<<< HEAD
+=======
+    # Extract PR-specific warnings from metadata
+    pr_warnings: list[str] = []
+    if result.original.is_puerto_rico and not result.original.urbanization:
+        pr_warnings.append("Puerto Rico address missing urbanization (URB) - deliverability uncertain")
+    if result.metadata.get("pr_warnings"):
+        pr_warnings.extend(result.metadata["pr_warnings"])
+
+>>>>>>> 04ca1a3554d0e96a498278e69485ff09f1595add
     return AddressVerifyResponse(
         success=result.status in (
             VerificationStatus.VERIFIED,
@@ -223,6 +249,12 @@ async def verify_address(request: AddressVerifyRequest) -> AddressVerifyResponse
         alternatives=[a.to_dict() for a in result.alternatives],
         processing_time_ms=result.metadata.get("total_time_ms", 0),
         metadata=result.metadata,
+<<<<<<< HEAD
+=======
+        is_puerto_rico=result.original.is_puerto_rico,
+        urbanization=result.original.urbanization,
+        pr_warnings=pr_warnings,
+>>>>>>> 04ca1a3554d0e96a498278e69485ff09f1595add
     )
 
 
