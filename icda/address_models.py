@@ -43,6 +43,7 @@ class AddressComponent(str, Enum):
     ZIP_CODE = "zip_code"
     ZIP_PLUS4 = "zip_plus4"
     COUNTRY = "country"
+    URBANIZATION = "urbanization"   # Puerto Rico only (URB field)
 
 
 @dataclass(slots=True)
@@ -60,6 +61,8 @@ class ParsedAddress:
         zip_code: 5-digit ZIP code.
         zip_plus4: Optional 4-digit ZIP extension.
         country: Country code (default US).
+        urbanization: Puerto Rico urbanization name (URB field, required for PR).
+        is_puerto_rico: True if this is a Puerto Rico address (ZIP 006-009).
         components_found: List of components successfully parsed.
         components_missing: List of components that couldn't be found.
     """
@@ -74,13 +77,25 @@ class ParsedAddress:
     zip_code: str | None = None
     zip_plus4: str | None = None
     country: str = "US"
+    urbanization: str | None = None
+    is_puerto_rico: bool = False
     components_found: list[AddressComponent] = field(default_factory=list)
     components_missing: list[AddressComponent] = field(default_factory=list)
 
     @property
     def formatted(self) -> str:
-        """Return formatted address string."""
+        """Return formatted address string.
+
+        For Puerto Rico addresses, includes URB line before street address:
+            URB URBANIZATION_NAME
+            STREET ADDRESS
+            CITY PR ZIP
+        """
         parts = []
+
+        # Urbanization line (Puerto Rico only - before street address)
+        if self.urbanization and self.is_puerto_rico:
+            parts.append(f"URB {self.urbanization}")
 
         # Street line
         street_parts = []
@@ -133,6 +148,8 @@ class ParsedAddress:
             "zip_code": self.zip_code,
             "zip_plus4": self.zip_plus4,
             "country": self.country,
+            "urbanization": self.urbanization,
+            "is_puerto_rico": self.is_puerto_rico,
             "formatted": self.single_line,
         }
 

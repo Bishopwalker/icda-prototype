@@ -112,6 +112,47 @@ services:
     profiles:
       - mcp
 
+  # ============================================
+  # MCP Knowledge Server (RAG for internal docs)
+  # Start with: docker-compose --profile mcp up -d mcp-knowledge
+  # ============================================
+  mcp-knowledge:
+    build:
+      context: ./mcp-knowledge-server
+      dockerfile: Dockerfile
+    image: icda-mcp-knowledge:latest
+    container_name: icda-mcp-knowledge
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./knowledge:/app/knowledge:ro
+      - mcp_knowledge_data:/app/data
+    environment:
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
+      - OPENSEARCH_HOST=http://opensearch:9200
+      - KNOWLEDGE_INDEX=icda-knowledge
+      - KNOWLEDGE_WATCH_FOLDER=/app/knowledge
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    restart: unless-stopped
+    networks:
+      - icda-network
+    profiles:
+      - mcp
+
 networks:
   icda-network:
     driver: bridge
@@ -120,3 +161,4 @@ volumes:
   redis_data:
   opensearch_data:
   mcp_data:
+  mcp_knowledge_data:

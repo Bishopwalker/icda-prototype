@@ -4,6 +4,17 @@
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp@latest"],
       "description": "Up-to-date documentation and code examples for libraries"
+    },
+    "knowledge": {
+      "command": "python",
+      "args": ["mcp-knowledge-server/server.py"],
+      "env": {
+        "OPENSEARCH_HOST": "${OPENSEARCH_HOST:-http://localhost:9200}",
+        "AWS_REGION": "${AWS_REGION:-us-east-1}",
+        "KNOWLEDGE_INDEX": "icda-knowledge",
+        "KNOWLEDGE_WATCH_FOLDER": "./knowledge"
+      },
+      "description": "Internal RAG knowledge base for ICDA domain knowledge (PR urbanization, address verification, patterns)"
     }
   }
 }

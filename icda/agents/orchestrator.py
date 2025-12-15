@@ -38,6 +38,7 @@ class QualityGate(str, Enum):
     STATE_VALID = "state_valid"
     ZIP_VALID = "zip_valid"
     CONFIDENCE_THRESHOLD = "confidence_threshold"
+    PR_URBANIZATION = "pr_urbanization"  # Puerto Rico urbanization required
 
 
 @dataclass(slots=True)
@@ -151,12 +152,12 @@ class ContextAgent:
         match = re.search(r'\b([A-Z]{2})\b', text)
         if match:
             state = match.group(1)
-            # Validate it's a real state
+            # Validate it's a real state (includes PR for Puerto Rico)
             valid_states = {
                 "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
                 "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
                 "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-                "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+                "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "PR", "RI", "SC",
                 "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
                 "DC",
             }
@@ -410,13 +411,13 @@ class EnforcerAgent:
         if has_location:
             passed_count += 1
 
-        # Gate 4: State valid
+        # Gate 4: State valid (includes PR for Puerto Rico)
         if parsed.state:
             valid_states = {
                 "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
                 "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
                 "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-                "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+                "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "PR", "RI", "SC",
                 "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
                 "DC",
             }
@@ -438,6 +439,23 @@ class EnforcerAgent:
                 message=f"ZIP {parsed.zip_code} found" if zip_valid else f"Unknown ZIP: {parsed.zip_code}",
             ))
             if zip_valid:
+                passed_count += 1
+
+        # Gate 6: Puerto Rico urbanization (only for PR addresses)
+        if parsed.is_puerto_rico:
+            has_urbanization = bool(parsed.urbanization)
+            gates.append(QualityGateResult(
+                gate=QualityGate.PR_URBANIZATION,
+                passed=has_urbanization,
+                message="PR urbanization present" if has_urbanization
+                        else "PR address missing urbanization - deliverability uncertain",
+                details={
+                    "zip_code": parsed.zip_code,
+                    "urbanization": parsed.urbanization,
+                    "is_puerto_rico": True,
+                },
+            ))
+            if has_urbanization:
                 passed_count += 1
 
         # Calculate confidence based on gates passed

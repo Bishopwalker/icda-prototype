@@ -29,6 +29,7 @@ from mcp.types import Tool, TextContent
 
 from knowledge_index import KnowledgeIndex
 from document_processor import DocumentProcessor
+from enforcer import EnforcerOrchestrator, BatchKnowledgeItem
 
 load_dotenv()
 
@@ -38,6 +39,7 @@ server = Server("knowledge-server")
 # Global instances (initialized on startup)
 knowledge_index: KnowledgeIndex | None = None
 doc_processor: DocumentProcessor | None = None
+enforcer_orchestrator: EnforcerOrchestrator | None = None
 
 # Configuration from environment
 WATCH_FOLDER = os.getenv("KNOWLEDGE_WATCH_FOLDER", "./knowledge_docs")
@@ -59,6 +61,18 @@ def get_processor() -> DocumentProcessor:
     if doc_processor is None:
         doc_processor = DocumentProcessor()
     return doc_processor
+
+
+async def get_enforcer() -> EnforcerOrchestrator:
+    """Lazy initialization of enforcer orchestrator."""
+    global enforcer_orchestrator
+    if enforcer_orchestrator is None:
+        enforcer_orchestrator = EnforcerOrchestrator(index_name=INDEX_NAME)
+        # Connect to same OpenSearch as knowledge index
+        index = await get_index()
+        if hasattr(index, 'client'):
+            enforcer_orchestrator.set_clients(opensearch_client=index.client)
+    return enforcer_orchestrator
 
 
 # ============== MCP Tools ==============
@@ -214,8 +228,8 @@ Example: delete_document(document_id="abc123")
         ),
         Tool(
             name="reindex_all",
-            description="""Re-process and reindex all documents. 
-            
+            description="""Re-process and reindex all documents.
+
 Useful after upgrading embedding models or changing chunk settings.
 WARNING: This will delete and recreate the entire index.
 """,
@@ -228,6 +242,111 @@ WARNING: This will delete and recreate the entire index.
                     }
                 },
                 "required": ["confirm"]
+            }
+        ),
+        # ============== 5-Agent Enforcer Tools ==============
+        Tool(
+            name="enforce_document",
+            description="""Process a document through the 5-agent enforcer pipeline.
+
+The pipeline validates and indexes knowledge with quality gates:
+1. IntakeGuard - Validates format, detects PR/batch content
+2. SemanticMiner - Extracts entities, patterns, rules
+3. ContextLinker - Links to existing knowledge
+4. QualityEnforcer - Russian Olympic Judge validation
+5. IndexSync - Indexes to OpenSearch with embeddings
+
+Returns detailed results from each agent and all quality gate outcomes.
+
+Example: enforce_document(file_path="/path/to/pr-rules.md")
+""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "Path to document file to process"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Or provide raw content directly (if no file_path)"
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "description": "Optional metadata to attach",
+                        "default": {}
+                    }
+                }
+            }
+        ),
+        Tool(
+            name="enforce_batch",
+            description="""Process multiple items through the 5-agent enforcer pipeline.
+
+Handles batches of addresses, rules, or examples with parallel processing.
+Each item goes through all 5 agents with quality validation.
+
+Example: enforce_batch(items=[{"id": "1", "content": "..."}, ...], parallel_limit=5)
+""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "string"},
+                                "content": {"type": "string"},
+                                "content_type": {"type": "string", "default": "unknown"},
+                                "context": {"type": "object", "default": {}}
+                            },
+                            "required": ["id", "content"]
+                        },
+                        "description": "List of items to process"
+                    },
+                    "parallel_limit": {
+                        "type": "integer",
+                        "description": "Max concurrent processing (default: 5)",
+                        "default": 5
+                    }
+                },
+                "required": ["items"]
+            }
+        ),
+        Tool(
+            name="get_enforcer_stats",
+            description="""Get statistics from the 5-agent enforcer pipeline.
+
+Returns processing counts, success rates, and per-agent metrics.
+""",
+            inputSchema={
+                "type": "object",
+                "properties": {}
+            }
+        ),
+        Tool(
+            name="search_pr_knowledge",
+            description="""Search for Puerto Rico specific knowledge.
+
+Filters results to only PR-relevant content (urbanization, ZIP 006-009, etc).
+
+Example: search_pr_knowledge(query="urbanization requirements", limit=10)
+""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query for PR knowledge"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max results (default: 10)",
+                        "default": 10
+                    }
+                },
+                "required": ["query"]
             }
         )
     ]
@@ -272,6 +391,25 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 result = {"error": "Must set confirm=true to reindex"}
             else:
                 result = await handle_reindex_all()
+        # 5-Agent Enforcer Tools
+        elif name == "enforce_document":
+            result = await handle_enforce_document(
+                arguments.get("file_path"),
+                arguments.get("content"),
+                arguments.get("metadata", {})
+            )
+        elif name == "enforce_batch":
+            result = await handle_enforce_batch(
+                arguments["items"],
+                arguments.get("parallel_limit", 5)
+            )
+        elif name == "get_enforcer_stats":
+            result = await handle_get_enforcer_stats()
+        elif name == "search_pr_knowledge":
+            result = await handle_search_pr_knowledge(
+                arguments["query"],
+                arguments.get("limit", 10)
+            )
         else:
             result = {"error": f"Unknown tool: {name}"}
             
@@ -424,11 +562,114 @@ async def handle_reindex_all() -> dict:
     """Reindex everything (dangerous!)."""
     index = await get_index()
     result = await index.reindex_all()
-    
+
     return {
         "success": True,
         "message": "Reindex complete",
         **result
+    }
+
+
+# ============== Enforcer Tool Handlers ==============
+
+async def handle_enforce_document(
+    file_path: str | None,
+    content: str | None,
+    metadata: dict
+) -> dict:
+    """Process document through 5-agent enforcer pipeline."""
+    if not file_path and not content:
+        return {"success": False, "error": "Must provide file_path or content"}
+
+    # Read file content if path provided
+    if file_path:
+        path = Path(file_path)
+        if not path.exists():
+            return {"success": False, "error": f"File not found: {file_path}"}
+        content = path.read_text(encoding="utf-8")
+        filename = path.name
+    else:
+        filename = metadata.get("title", "direct_upload.txt")
+
+    # Get enforcer and process
+    enforcer = await get_enforcer()
+    result = await enforcer.process(
+        content=content,
+        filename=filename,
+        metadata=metadata
+    )
+
+    return {
+        "success": result.success,
+        "document_id": result.index.doc_id if result.index else None,
+        "gates_passed": result.gates_passed,
+        "gates_failed": result.gates_failed,
+        "quality_score": result.quality.overall_score if result.quality else 0.0,
+        "chunks_created": result.index.chunks_created if result.index else 0,
+        "is_pr_relevant": result.intake.is_pr_relevant if result.intake else False,
+        "total_time_ms": result.total_time_ms,
+        "agent_timings": result.agent_timings,
+    }
+
+
+async def handle_enforce_batch(
+    items: list[dict],
+    parallel_limit: int
+) -> dict:
+    """Process batch through 5-agent enforcer pipeline."""
+    # Convert to BatchKnowledgeItem objects
+    batch_items = [
+        BatchKnowledgeItem(
+            id=item["id"],
+            content=item["content"],
+            content_type=item.get("content_type", "unknown"),
+            context=item.get("context", {})
+        )
+        for item in items
+    ]
+
+    # Get enforcer and process batch
+    enforcer = await get_enforcer()
+    results, summary = await enforcer.process_batch(
+        items=batch_items,
+        parallel_limit=parallel_limit
+    )
+
+    return {
+        "success": summary.success_rate > 0.5,
+        "summary": summary.to_dict(),
+        "results": [r.to_dict() for r in results],
+    }
+
+
+async def handle_get_enforcer_stats() -> dict:
+    """Get enforcer pipeline statistics."""
+    enforcer = await get_enforcer()
+    stats = enforcer.get_stats()
+
+    return {
+        "success": True,
+        **stats
+    }
+
+
+async def handle_search_pr_knowledge(query: str, limit: int) -> dict:
+    """Search for PR-specific knowledge."""
+    index = await get_index()
+
+    # Search with PR filter
+    results = await index.search(
+        query=query,
+        limit=limit,
+        filters={"pr_relevant": True}
+    )
+
+    return {
+        "success": True,
+        "query": query,
+        "filter": "pr_relevant=true",
+        "results": results.get("hits", []),
+        "total_matches": results.get("total", 0)
     }
 
 

@@ -608,5 +608,225 @@ class TestIntegration:
         assert "Turkey" in result.verified.street_name
 
 
+# ============================================================================
+# Puerto Rico Address Tests
+# ============================================================================
+
+
+class TestPuertoRicoAddresses:
+    """Tests for Puerto Rico address handling with urbanization support."""
+
+    def test_detect_pr_by_zip(self):
+        """Test detecting PR address by ZIP code (006-009)."""
+        pr_zips = ["00601", "00705", "00802", "00924"]
+        non_pr_zips = ["10001", "22222", "90210", "00501"]  # 005xx is NY
+
+        for zip_code in pr_zips:
+            raw = f"123 Calle Luna, San Juan, PR {zip_code}"
+            parsed = AddressNormalizer.normalize(raw)
+            assert parsed.is_puerto_rico, f"ZIP {zip_code} should be PR"
+
+        for zip_code in non_pr_zips:
+            raw = f"123 Main St, City, ST {zip_code}"
+            parsed = AddressNormalizer.normalize(raw)
+            assert not parsed.is_puerto_rico, f"ZIP {zip_code} should not be PR"
+
+    def test_parse_pr_with_urbanization(self):
+        """Test parsing PR address with URB prefix."""
+        raw = "URB Villa Carolina, 123 Calle A, Carolina, PR 00983"
+        parsed = AddressNormalizer.normalize(raw)
+
+        assert parsed.is_puerto_rico
+        # Urbanization is normalized to uppercase
+        assert parsed.urbanization.upper() == "VILLA CAROLINA"
+        assert parsed.zip_code == "00983"
+        assert AddressComponent.URBANIZATION in parsed.components_found
+
+    def test_parse_pr_urbanizacion_spanish(self):
+        """Test parsing PR address with Spanish URBANIZACION term."""
+        raw = "URBANIZACION Las Lomas, 456 Calle B, Bayamon, PR 00961"
+        parsed = AddressNormalizer.normalize(raw)
+
+        assert parsed.is_puerto_rico
+        # Urbanization is normalized to uppercase
+        assert parsed.urbanization.upper() == "LAS LOMAS"
+        assert parsed.zip_code == "00961"
+
+    def test_parse_pr_urb_lowercase(self):
+        """Test parsing PR address with lowercase urb."""
+        raw = "urb country club, 789 Ave Principal, Rio Piedras, PR 00926"
+        parsed = AddressNormalizer.normalize(raw)
+
+        assert parsed.is_puerto_rico
+        assert parsed.urbanization is not None
+        assert "Country Club" in parsed.urbanization or "country club" in parsed.urbanization.lower()
+
+    def test_classify_pr_missing_urbanization(self):
+        """Test classification warns when PR address missing urbanization."""
+        parsed = ParsedAddress(
+            raw="123 Calle Luna, San Juan, PR 00901",
+            street_number="123",
+            street_name="Calle Luna",
+            city="San Juan",
+            state="PR",
+            zip_code="00901",
+            is_puerto_rico=True,
+            urbanization=None,  # Missing!
+        )
+        classification = AddressNormalizer.classify(parsed)
+
+        # Should have a warning about missing urbanization
+        has_urb_warning = any(
+            "urbaniz" in issue.lower() for issue in classification.issues
+        )
+        assert has_urb_warning, f"Should warn about missing urbanization: {classification.issues}"
+
+    def test_pr_with_urbanization_no_warning(self):
+        """Test PR address with urbanization has no warning."""
+        parsed = ParsedAddress(
+            raw="URB Villa Carolina, 123 Calle A, Carolina, PR 00983",
+            street_number="123",
+            street_name="Calle A",
+            city="Carolina",
+            state="PR",
+            zip_code="00983",
+            is_puerto_rico=True,
+            urbanization="Villa Carolina",
+            components_found=[AddressComponent.URBANIZATION],
+        )
+        classification = AddressNormalizer.classify(parsed)
+
+        # Should NOT have urbanization warning
+        has_urb_warning = any(
+            "urbaniz" in issue.lower() for issue in classification.issues
+        )
+        assert not has_urb_warning, f"Should not warn when urbanization present: {classification.issues}"
+
+    def test_pr_formatted_address_includes_urbanization(self):
+        """Test formatted PR address includes URB line."""
+        parsed = ParsedAddress(
+            raw="URB Villa Carolina, 123 Calle A, Carolina, PR 00983",
+            street_number="123",
+            street_name="Calle A",
+            city="Carolina",
+            state="PR",
+            zip_code="00983",
+            is_puerto_rico=True,
+            urbanization="Villa Carolina",
+        )
+
+        formatted = parsed.formatted
+        assert "URB Villa Carolina" in formatted
+        # URB should be on its own line before street
+        lines = formatted.split("\n")
+        assert len(lines) >= 2
+        assert "URB" in lines[0]
+
+    def test_pr_single_line_format(self):
+        """Test single-line format includes urbanization."""
+        parsed = ParsedAddress(
+            raw="URB Villa Carolina, 123 Calle A, Carolina, PR 00983",
+            street_number="123",
+            street_name="Calle A",
+            city="Carolina",
+            state="PR",
+            zip_code="00983",
+            is_puerto_rico=True,
+            urbanization="Villa Carolina",
+        )
+
+        single_line = parsed.single_line
+        assert "URB Villa Carolina" in single_line
+
+    def test_pr_to_dict_includes_fields(self):
+        """Test to_dict includes PR-specific fields."""
+        parsed = ParsedAddress(
+            raw="URB Villa Carolina, 123 Calle A, Carolina, PR 00983",
+            street_number="123",
+            street_name="Calle A",
+            city="Carolina",
+            state="PR",
+            zip_code="00983",
+            is_puerto_rico=True,
+            urbanization="Villa Carolina",
+        )
+
+        d = parsed.to_dict()
+        assert d["is_puerto_rico"] is True
+        assert d["urbanization"] == "Villa Carolina"
+
+    def test_non_pr_skips_urbanization(self):
+        """Test non-PR address doesn't get is_puerto_rico flag."""
+        raw = "123 Main St, New York, NY 10001"
+        parsed = AddressNormalizer.normalize(raw)
+
+        assert not parsed.is_puerto_rico
+        assert parsed.urbanization is None
+
+    def test_pr_index_urbanization_lookup(self):
+        """Test address index can lookup by urbanization."""
+        index = AddressIndex()
+
+        # Build index with PR customer
+        pr_customers = [
+            {
+                "crid": "CRID-PR-001",
+                "name": "Maria Rodriguez",
+                "address": "URB Villa Carolina, 123 Calle A",
+                "city": "Carolina",
+                "state": "PR",
+                "zip": "00983",
+            },
+        ]
+        index.build_from_customers(pr_customers)
+
+        # Lookup by urbanization
+        results = index.lookup_by_urbanization("Villa Carolina", "00983")
+        assert len(results) >= 1, "Should find by urbanization"
+
+    @pytest.fixture
+    def pr_sample_customers(self):
+        """Sample PR customer data for testing."""
+        return [
+            {
+                "crid": "CRID-PR-001",
+                "name": "Maria Rodriguez",
+                "address": "URB Villa Carolina, 123 Calle A",
+                "city": "Carolina",
+                "state": "PR",
+                "zip": "00983",
+            },
+            {
+                "crid": "CRID-PR-002",
+                "name": "Jose Garcia",
+                "address": "URBANIZACION Las Lomas, 456 Calle B",
+                "city": "Bayamon",
+                "state": "PR",
+                "zip": "00961",
+            },
+            {
+                "crid": "CRID-PR-003",
+                "name": "Ana Martinez",
+                "address": "789 Ave Ponce de Leon",  # No urbanization
+                "city": "San Juan",
+                "state": "PR",
+                "zip": "00907",
+            },
+        ]
+
+    def test_pr_index_builds_urbanization_index(self, pr_sample_customers):
+        """Test index builds urbanization lookup structure."""
+        index = AddressIndex()
+        index.build_from_customers(pr_sample_customers)
+
+        # Check stats include PR info
+        stats = index.stats()
+        assert stats["indexed"] is True
+
+        # Should have urbanization index entries
+        urb_lookup = index.lookup_by_urbanization("Villa Carolina")
+        assert len(urb_lookup) >= 1
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
