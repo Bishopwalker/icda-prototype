@@ -36,8 +36,12 @@ tests/
 *.md
 !README.md
 
-# Claude context (not needed in container)
-.claude/
+# AI instructions (not needed in container, but keep GitHub workflows)
+.github/agents/
+.github/commands/
+.github/copilot-instructions.md
+.github/INITIAL.md
+.github/INDEX.md
 
 # Misc
 *.log

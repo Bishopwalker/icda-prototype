@@ -1,0 +1,2964 @@
+# RAG Index Manifest
+
+Generated: 2025-12-11T13:02:36.832817
+Project: `C:\Users\bisho\IdeaProjects\UNIVERSAL_CONTEXT_TEMPLATE`
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Target Chunks | 666 |
+| Actual Chunks | 666 |
+| Total Files | 121 |
+| Avg Chunk Size | 723 chars |
+| Est. Total Tokens | 120,161 |
+| Quality Score | 0.00 |
+
+## Chunks by Category
+
+- **documentation**: 553 chunks
+- **source_code**: 113 chunks
+
+## Chunks by Type
+
+- **markdown_section**: 553
+- **python_class**: 77
+- **python_function**: 36
+
+## Category Index
+
+Use these sections to navigate and fine-tune the chunking.
+
+### Documentation
+
+*553 chunks*
+
+#### `.github\copilot-instructions.md`
+
+- **markdown_section_f5438c70_1** (markdown_section, L1-9)
+  - Summary: - **MANDATORY: Test everything live before committing** - run the application, v...
+  - Keywords: COMMIT, JUDGE, FLAW, LIE, STANDARD
+  - Size: 621 chars (~155 tokens)
+- **markdown_section_ef2b1bf1_10** (markdown_section, L10-15)
+  - Summary: - **Always read `PLANNING.md`** at the start of a new conversation to understand...
+  - Keywords: the, and, PLANNING, style, understand
+  - Size: 568 chars (~142 tokens)
+- **markdown_section_bde98ca5_16** (markdown_section, L16-30)
+  - Summary: - **Never create a file longer than 500 lines of code.** If a file approaches th...
+  - Keywords: files, Never, limit, refactor, file
+  - Size: 853 chars (~213 tokens)
+- **markdown_section_956fafeb_31** (markdown_section, L31-49)
+  - Summary: - **Mark completed tasks in `TASK.md`** immediately after finishing them....
+  - Keywords: completed, Mark, immediately, sub, TASK
+  - Size: 700 chars (~175 tokens)
+- **markdown_section_8d08d4fa_50** (markdown_section, L50-54)
+  - Summary: - **Update `README.md`** when new features are added, dependencies change, or se...
+  - Keywords: added, and, new, features, Explainability
+  - Size: 331 chars (~82 tokens)
+- **markdown_section_18cdcf22_55** (markdown_section, L55-62)
+  - Summary: - **Standard**: "My Dude", "Cash Money", "Yung Nigga", "My Nigga", "folks", "Mil...
+  - Keywords: Yung, the, and, these, with
+  - Size: 699 chars (~174 tokens)
+- **markdown_section_ae1d4c45_63** (markdown_section, L63-71)
+  - Summary: - **Never assume missing context. Ask questions if uncertain.**...
+  - Keywords: Never, Rules, use, known, Ask
+  - Size: 647 chars (~161 tokens)
+- **markdown_section_e7e65059_72** (markdown_section, L72-78)
+  - Summary: - **Always test each feature live** by running it and reading output....
+  - Keywords: the, and, test, Testing, live
+  - Size: 441 chars (~110 tokens)
+- **markdown_section_a2d8c316_79** (markdown_section, L79-87)
+  - Summary: - **ALWAYS check if ports are available first** before starting new dev servers....
+  - Keywords: check, ALWAYS, existing, before, dev
+  - Size: 559 chars (~139 tokens)
+- **markdown_section_f82f8d1d_88** (markdown_section, L88-93)
+  - Summary: - **Each completed feature** must be added, committed with concise commit messag...
+  - Keywords: added, and, Standards, with, norms
+  - Size: 404 chars (~101 tokens)
+- **markdown_section_526a5b12_94** (markdown_section, L94-103)
+  - Summary: - **Always ensure CI/CD pipeline works** - run tests and build before committing...
+  - Keywords: and, Standards, code, Quality, build
+  - Size: 727 chars (~181 tokens)
+- **markdown_section_88095ecf_104** (markdown_section, L104-110)
+  - Summary: - **Implement comprehensive logging** for critical operations with detailed trac...
+  - Keywords: Monitoring, Performance, Logging, Implement, with
+  - Size: 580 chars (~145 tokens)
+
+#### `.github\INDEX.md`
+
+- **markdown_section_d7f928ac_1** (markdown_section, L1-7)
+  - Summary: # INDEX.md...
+  - Keywords: index, the, provides, Context, order
+  - Size: 174 chars (~43 tokens)
+- **markdown_section_e83135e2_8** (markdown_section, L8-19)
+  - Summary: - `URGENT_READ_FIRST.md` - Critical info from previous session (if exists)...
+  - Keywords: check, session, CONTEXT, BEFORE, Critical
+  - Size: 361 chars (~90 tokens)
+- **markdown_section_ccddb080_20** (markdown_section, L20-25)
+  - Summary: ```bash...
+  - Keywords: Automated, Context, bash, Run, command
+  - Size: 121 chars (~30 tokens)
+- **markdown_section_d2e20341_26** (markdown_section, L26-37)
+  - Summary: ```...
+  - Keywords: Manual, Reading, Context, exists, file
+  - Size: 355 chars (~88 tokens)
+- **markdown_section_7174b308_38** (markdown_section, L38-47)
+  - Summary: ```...
+  - Keywords: files, PLANNING, code, Feature, Fixes
+  - Size: 184 chars (~46 tokens)
+- **markdown_section_bfaf4477_48** (markdown_section, L48-57)
+  - Summary: ```...
+  - Keywords: files, deployment, Quality, INFRASTRUCTURE, CLAUDE
+  - Size: 174 chars (~43 tokens)
+- **markdown_section_13acba14_58** (markdown_section, L58-64)
+  - Summary: ```...
+  - Keywords: Context, Previous, with, work, SESSION_
+  - Size: 156 chars (~39 tokens)
+- **markdown_section_f846e5b4_65** (markdown_section, L65-73)
+  - Summary: - `.github/URGENT_READ_FIRST.md` - Critical context from previous session...
+  - Keywords: session, and, CRITICAL, Critical, Check
+  - Size: 479 chars (~119 tokens)
+- **markdown_section_be8d2fa2_74** (markdown_section, L74-83)
+  - Summary: - `../PLANNING.md` - Architecture decisions, naming conventions, workflows...
+  - Keywords: PLANNING, decisions, work, Quality, known
+  - Size: 458 chars (~114 tokens)
+- **markdown_section_aac14afd_84** (markdown_section, L84-88)
+  - Summary: - `commands/*.md` - Automation scripts and workflows...
+  - Keywords: and, workflows, activation, agent, AUTOMATION
+  - Size: 213 chars (~53 tokens)
+- **markdown_section_262e5e6c_89** (markdown_section, L89-109)
+  - Summary: - `agents/README.md` - Agent system overview...
+  - Keywords: Technology, Agent, KAFKA_AGENT, usage, Apache
+  - Size: 1137 chars (~284 tokens)
+- **markdown_section_af3f5359_110** (markdown_section, L110-117)
+  - Summary: 1. `copilot-instructions.md` - Component standards and naming conventions...
+  - Keywords: Specific, and, files, Navigation, PLANNING
+  - Size: 244 chars (~61 tokens)
+- **markdown_section_fdf922de_118** (markdown_section, L118-128)
+  - Summary: 1. `copilot-instructions.md` - Backend standards and testing requirements...
+  - Keywords: files, and, testing, API, CLAUDE
+  - Size: 331 chars (~82 tokens)
+- **markdown_section_1806ecc2_129** (markdown_section, L129-130)
+  - Summary: ## 🤖 Specialized Agents...
+  - Keywords: Specialized, Agents
+  - Size: 24 chars (~6 tokens)
+- **markdown_section_6739731d_131** (markdown_section, L131-155)
+  - Summary: Activate specialized AI agents for focused technical assistance:...
+  - Keywords: assistance, Expert, Technology, Kafka, focused
+  - Size: 956 chars (~239 tokens)
+- **markdown_section_842d5c7d_156** (markdown_section, L156-163)
+  - Summary: 1. **Start**: `agents/README.md` - Overview of all agents...
+  - Keywords: Navigation, name, Guide, agent, Path
+  - Size: 338 chars (~84 tokens)
+- **markdown_section_6f60ee8e_164** (markdown_section, L164-173)
+  - Summary: ```...
+  - Keywords: agent, aws, springcloud, Microservices, springboot
+  - Size: 222 chars (~55 tokens)
+- **markdown_section_1842a25e_174** (markdown_section, L174-185)
+  - Summary: ```...
+  - Keywords: Container, Kafka, Troubleshooting, issues, problems
+  - Size: 285 chars (~71 tokens)
+- **markdown_section_ee8a3ee1_186** (markdown_section, L186-201)
+  - Summary: ```...
+  - Keywords: document, redundancy, Target, maintaining, agent
+  - Size: 459 chars (~114 tokens)
+- **markdown_section_08feec14_202** (markdown_section, L202-208)
+  - Summary: - Project-specific file locations...
+  - Keywords: files, Lookup, file, Find, Quick
+  - Size: 135 chars (~33 tokens)
+- **markdown_section_d61d5f14_209** (markdown_section, L209-218)
+  - Summary: - Build failures...
+  - Keywords: framework, Development, environment, Add, relevant
+  - Size: 254 chars (~63 tokens)
+- **markdown_section_50e6310d_219** (markdown_section, L219-225)
+  - Summary: - `.github/` directory files are **authoritative**...
+  - Keywords: the, symlinked, use, backup, File
+  - Size: 200 chars (~50 tokens)
+- **markdown_section_5f3f2b91_226** (markdown_section, L226-240)
+  - Summary: - **ALWAYS check for URGENT_READ_FIRST.md** when starting a new session...
+  - Keywords: check, ALWAYS, session, files, starting
+  - Size: 644 chars (~161 tokens)
+- **markdown_section_c5caf59a_241** (markdown_section, L241-261)
+  - Summary: If you lose context or get confused:...
+  - Keywords: read, Context, you, lose, file
+  - Size: 740 chars (~185 tokens)
+
+#### `.github\INFRASTRUCTURE.md`
+
+- **markdown_section_13a2bb9c_1** (markdown_section, L1-3)
+  - Summary: # INFRASTRUCTURE.md...
+  - Keywords: Universal, Context, Template, Guide, INFRASTRUCTURE
+  - Size: 84 chars (~21 tokens)
+- **markdown_section_7052c86e_4** (markdown_section, L4-18)
+  - Summary: This template is designed for easy distribution via Docker, allowing users to qu...
+  - Keywords: with, full, users, quickly, projects
+  - Size: 460 chars (~115 tokens)
+- **markdown_section_42dc4dd2_19** (markdown_section, L19-23)
+  - Summary: ## 📦 Building the Image...
+  - Keywords: the, Image, bash, Build, Building
+  - Size: 50 chars (~12 tokens)
+- **markdown_section_216ef882_24** (markdown_section, L24-29)
+  - Summary: docker build -t universal-context-template:latest ....
+  - Keywords: Build, latest, Dockerfile, use, docker
+  - Size: 123 chars (~30 tokens)
+- **markdown_section_4cd9c238_30** (markdown_section, L30-36)
+  - Summary: docker images | grep universal-context-template...
+  - Keywords: grep, bash, Build, images, docker
+  - Size: 121 chars (~30 tokens)
+- **markdown_section_63ec276c_37** (markdown_section, L37-45)
+  - Summary: docker buildx build --platform linux/amd64,linux/arm64 \...
+  - Keywords: amd64, Build, linux, latest, compatibility
+  - Size: 273 chars (~68 tokens)
+- **markdown_section_140237f5_46** (markdown_section, L46-51)
+  - Summary: ## 🚀 Distribution Methods...
+  - Keywords: Image, Methods, bash, Distribution, Export
+  - Size: 106 chars (~26 tokens)
+- **markdown_section_f0053c8c_52** (markdown_section, L52-57)
+  - Summary: docker save universal-context-template:latest > context-template.tar...
+  - Keywords: image, file, size, smaller, save
+  - Size: 208 chars (~52 tokens)
+- **markdown_section_f8c7318a_58** (markdown_section, L58-65)
+  - Summary: ```...
+  - Keywords: the, image, file, bash, cloud
+  - Size: 142 chars (~35 tokens)
+- **markdown_section_e78a5cea_66** (markdown_section, L66-72)
+  - Summary: gunzip -c context-template.tar.gz | docker load...
+  - Keywords: grep, images, tar, gunzip, compressed
+  - Size: 137 chars (~34 tokens)
+- **markdown_section_9b053abd_73** (markdown_section, L73-79)
+  - Summary: ```bash...
+  - Keywords: username, image, bash, with, latest
+  - Size: 199 chars (~49 tokens)
+- **markdown_section_86f6ddb9_80** (markdown_section, L80-88)
+  - Summary: docker login...
+  - Keywords: username, and, image, Login, bash
+  - Size: 140 chars (~35 tokens)
+- **markdown_section_c9abf107_89** (markdown_section, L89-95)
+  - Summary: docker pull your-username/universal-context-template:latest...
+  - Keywords: username, latest, Run, pull, Users
+  - Size: 119 chars (~29 tokens)
+- **markdown_section_0f8814bf_96** (markdown_section, L96-102)
+  - Summary: ```bash...
+  - Keywords: bash, deployment, tag, latest, yourcompany
+  - Size: 201 chars (~50 tokens)
+- **markdown_section_def94f24_103** (markdown_section, L103-108)
+  - Summary: docker push registry.yourcompany.com/context-template:latest...
+  - Keywords: com, push, latest, Patterns, docker
+  - Size: 114 chars (~28 tokens)
+- **markdown_section_2473827e_109** (markdown_section, L109-117)
+  - Summary: ```bash...
+  - Keywords: and, Initialize, Shot, docker, project
+  - Size: 228 chars (~57 tokens)
+- **markdown_section_53af8859_118** (markdown_section, L118-123)
+  - Summary: ```bash...
+  - Keywords: bash, Pattern, run, Development, container
+  - Size: 122 chars (~30 tokens)
+- **markdown_section_8ac96873_124** (markdown_section, L124-132)
+  - Summary: ./template/scripts/init-project.sh project1...
+  - Keywords: project1, project, init, multiple, projects
+  - Size: 235 chars (~58 tokens)
+- **markdown_section_5ed92f3d_133** (markdown_section, L133-141)
+  - Summary: .\scripts\init-project.ps1 -ProjectName my-project -OutputDir "C:\Projects"...
+  - Keywords: the, ProjectName, init, docker, project
+  - Size: 281 chars (~70 tokens)
+- **markdown_section_8bef849a_142** (markdown_section, L142-144)
+  - Summary: ```yaml...
+  - Keywords: Integration, yaml, Pattern
+  - Size: 41 chars (~10 tokens)
+- **markdown_section_8a590a5e_145** (markdown_section, L145-169)
+  - Summary: name: Initialize Project...
+  - Keywords: Initialize, jobs, init, docker, GitHub
+  - Size: 680 chars (~170 tokens)
+- **markdown_section_1505b3db_170** (markdown_section, L170-174)
+  - Summary: ## 🔧 Configuration...
+  - Keywords: Variables, Configuration, bash, Environment
+  - Size: 55 chars (~13 tokens)
+- **markdown_section_0f0d2667_175** (markdown_section, L175-180)
+  - Summary: TEMPLATE_HOME=/template...
+  - Keywords: Template, home, projects, OUTPUT_DIR, output
+  - Size: 107 chars (~26 tokens)
+- **markdown_section_5e523eec_181** (markdown_section, L181-188)
+  - Summary: TEMPLATE_VERSION=2.1...
+  - Keywords: permission, TEMPLATE_VERSION, Template, IDs, GROUP_ID
+  - Size: 118 chars (~29 tokens)
+- **markdown_section_01d18fb9_189** (markdown_section, L189-207)
+  - Summary: ```yaml...
+  - Keywords: services, Compose, yaml, Mount, desired
+  - Size: 420 chars (~105 tokens)
+- **markdown_section_2d50ad23_208** (markdown_section, L208-219)
+  - Summary: ## 🛠️ Customization...
+  - Keywords: yaml, Mount, Customization, Create, Custom
+  - Size: 230 chars (~57 tokens)
+- **markdown_section_c76271a7_220** (markdown_section, L220-225)
+  - Summary: ```dockerfile...
+  - Keywords: the, tool, Extending, Dockerfile, apk
+  - Size: 101 chars (~25 tokens)
+- **markdown_section_ed1fcace_226** (markdown_section, L226-232)
+  - Summary: COPY custom-scripts/ /usr/local/bin/...
+  - Keywords: COPY, Set, environment, ENV, CUSTOM_VAR
+  - Size: 110 chars (~27 tokens)
+- **markdown_section_b830f0aa_233** (markdown_section, L233-239)
+  - Summary: - Base Alpine: ~5MB...
+  - Keywords: Optimization, Current, Image, Alpine, Base
+  - Size: 105 chars (~26 tokens)
+- **markdown_section_468192c0_240** (markdown_section, L240-264)
+  - Summary: 1. **Use multi-stage builds:**...
+  - Keywords: Optimization, COPY, builder, builds, multi
+  - Size: 457 chars (~114 tokens)
+- **markdown_section_bae33676_265** (markdown_section, L265-289)
+  - Summary: 1. **Don't include secrets in image:**...
+  - Keywords: passwords, include, API, tokens, root
+  - Size: 504 chars (~126 tokens)
+- **markdown_section_2421abca_290** (markdown_section, L290-298)
+  - Summary: ### Issue: Permission Denied...
+  - Keywords: Permission, Set, chmod, write, bash
+  - Size: 148 chars (~37 tokens)
+- **markdown_section_d0ec3917_299** (markdown_section, L299-308)
+  - Summary: docker-compose run -e USER_ID=$(id -u) -e GROUP_ID=$(id -g) context-template bas...
+  - Keywords: Image, image, bash, Problem, compose
+  - Size: 213 chars (~53 tokens)
+- **markdown_section_4a1af5de_309** (markdown_section, L309-315)
+  - Summary: docker save universal-context-template:latest | gzip > context-template.tar.gz...
+  - Keywords: gzip, before, smaller, save, latest
+  - Size: 266 chars (~66 tokens)
+- **markdown_section_b019425b_316** (markdown_section, L316-325)
+  - Summary: ### Issue: Scripts Not Executable...
+  - Keywords: chmod, won, Problem, Shell, Solution
+  - Size: 189 chars (~47 tokens)
+- **markdown_section_efd535a5_326** (markdown_section, L326-334)
+  - Summary: ### Issue: Windows Line Endings...
+  - Keywords: bash, Line, Problem, Solution, dos2unix
+  - Size: 149 chars (~37 tokens)
+- **markdown_section_bfb968fb_335** (markdown_section, L335-340)
+  - Summary: RUN find /template/scripts -name "*.sh" -exec dos2unix {} \;...
+  - Keywords: Monitoring, find, Logging, name, dos2unix
+  - Size: 112 chars (~28 tokens)
+- **markdown_section_3e28e319_341** (markdown_section, L341-346)
+  - Summary: ```bash...
+  - Keywords: Container, bash, compose, View, container
+  - Size: 91 chars (~22 tokens)
+- **markdown_section_fc39e306_347** (markdown_section, L347-353)
+  - Summary: docker run universal-context-template:latest bash /template/scripts/init-project...
+  - Keywords: bash, Health, latest, project, Check
+  - Size: 157 chars (~39 tokens)
+- **markdown_section_a358ae71_354** (markdown_section, L354-360)
+  - Summary: HEALTHCHECK --interval=30s --timeout=3s \...
+  - Keywords: check, timeout, HEALTHCHECK, interval, Dockerfile
+  - Size: 145 chars (~36 tokens)
+- **markdown_section_371d630a_361** (markdown_section, L361-371)
+  - Summary: ```bash...
+  - Keywords: Initialize, project1, bash, project, Batch
+  - Size: 274 chars (~68 tokens)
+- **markdown_section_1ced4f76_372** (markdown_section, L372-380)
+  - Summary: ```bash...
+  - Keywords: different, Custom, bash, Template, Build
+  - Size: 269 chars (~67 tokens)
+- **markdown_section_6f0a3b92_381** (markdown_section, L381-392)
+  - Summary: ```bash...
+  - Keywords: App, Create, bash, with, Yeoman
+  - Size: 263 chars (~65 tokens)
+- **markdown_section_96337dd3_393** (markdown_section, L393-402)
+  - Summary: ## 📝 Maintenance...
+  - Keywords: the, with, Maintenance, Rebuild, build
+  - Size: 269 chars (~67 tokens)
+- **markdown_section_2696475f_403** (markdown_section, L403-410)
+  - Summary: ```bash...
+  - Keywords: bash, Version, latest, tag, versions
+  - Size: 276 chars (~69 tokens)
+- **markdown_section_3ba76f93_411** (markdown_section, L411-422)
+  - Summary: docker push universal-context-template:1.0.0...
+  - Keywords: tags, push, Last, Updated, docker
+  - Size: 289 chars (~72 tokens)
+
+#### `.github\INITIAL.md`
+
+- **markdown_section_15367a5c_1** (markdown_section, L1-6)
+  - Summary: # [PROJECT NAME] - Initial Project Specification...
+  - Keywords: does, one, Specification, Brief, what
+  - Size: 140 chars (~35 tokens)
+- **markdown_section_2a37d824_7** (markdown_section, L7-19)
+  - Summary: - **Feature 1**: [Description of main feature]...
+  - Keywords: Description, Core, Feature, Functionality, Frontend
+  - Size: 506 chars (~126 tokens)
+- **markdown_section_657d553c_20** (markdown_section, L20-26)
+  - Summary: - [Example implementation or pattern]...
+  - Keywords: the, pattern, applies, demonstrates, project
+  - Size: 159 chars (~39 tokens)
+- **markdown_section_3b5a0014_27** (markdown_section, L27-36)
+  - Summary: - [Example implementation or pattern]...
+  - Keywords: the, pattern, applies, demonstrates, project
+  - Size: 303 chars (~75 tokens)
+- **markdown_section_aede4884_37** (markdown_section, L37-43)
+  - Summary: - `ComponentName`: [Description of component]...
+  - Keywords: Description, Component, component, Examples, DOCUMENTATION
+  - Size: 186 chars (~46 tokens)
+- **markdown_section_1d214bea_44** (markdown_section, L44-53)
+  - Summary: - **[Technology 1]**: [Link to documentation]...
+  - Keywords: Technology, Key, Link, and, links
+  - Size: 357 chars (~89 tokens)
+- **markdown_section_ce5bc414_54** (markdown_section, L54-60)
+  - Summary: - [Best practice 1]...
+  - Keywords: DESIGN, ARCHITECTURE, Practices, Best, PATTERNS
+  - Size: 116 chars (~29 tokens)
+- **markdown_section_e7b6d62a_61** (markdown_section, L61-80)
+  - Summary: [Describe the overall system architecture]...
+  - Keywords: the, Key, Description, System, Component
+  - Size: 415 chars (~103 tokens)
+- **markdown_section_1994ea85_81** (markdown_section, L81-90)
+  - Summary: ## OTHER CONSIDERATIONS:...
+  - Keywords: and, CONSIDERATIONS, Details, Critical, Description
+  - Size: 350 chars (~87 tokens)
+- **markdown_section_b51cfd92_91** (markdown_section, L91-106)
+  - Summary: 1. **[Requirement Category]**: [Detailed requirements]...
+  - Keywords: Specific, Requirement, Category, Project, Requirements
+  - Size: 605 chars (~151 tokens)
+- **markdown_section_da447e27_107** (markdown_section, L107-117)
+  - Summary: 1. **[Common Mistake 1]**: [Why it's a problem and how to avoid]...
+  - Keywords: and, how, Avoid, Mistakes, Common
+  - Size: 678 chars (~169 tokens)
+- **markdown_section_7f579de5_118** (markdown_section, L118-127)
+  - Summary: 1. **[Gotcha 1]**: [Description and solution]...
+  - Keywords: Gotcha, and, Description, Gotchas, solution
+  - Size: 285 chars (~71 tokens)
+- **markdown_section_1bcd4885_128** (markdown_section, L128-145)
+  - Summary: ```[language]...
+  - Keywords: pattern, example, Pattern, code, use
+  - Size: 268 chars (~67 tokens)
+- **markdown_section_528a2fd1_146** (markdown_section, L146-162)
+  - Summary: ```[language]...
+  - Keywords: Performance, pattern, example, Pattern, Description
+  - Size: 367 chars (~91 tokens)
+- **markdown_section_076bb98b_163** (markdown_section, L163-178)
+  - Summary: ```[language]...
+  - Keywords: Specific, and, Error, pattern, example
+  - Size: 371 chars (~92 tokens)
+- **markdown_section_7059013f_179** (markdown_section, L179-183)
+  - Summary: - **[Technology/Feature]**: [Compatibility notes]...
+  - Keywords: Technology, and, Compatibility, Feature, Browser
+  - Size: 188 chars (~47 tokens)
+
+#### `.github\PROJECT_CONFIG.md`
+
+- **markdown_section_6aa06f1a_1** (markdown_section, L1-8)
+  - Summary: # PROJECT CONFIGURATION...
+  - Keywords: Technology, Stack, settings, these, Python
+  - Size: 351 chars (~87 tokens)
+- **markdown_section_dde91174_9** (markdown_section, L9-18)
+  - Summary: ## Development Tools...
+  - Keywords: Vitest, Jest, Runner, Mocha, Tools
+  - Size: 516 chars (~129 tokens)
+- **markdown_section_fadbdbc2_19** (markdown_section, L19-32)
+  - Summary: ## Development Servers...
+  - Keywords: Port, dev, Frontend, yarn, Backend
+  - Size: 714 chars (~178 tokens)
+- **markdown_section_593c733a_33** (markdown_section, L33-43)
+  - Summary: ## Database & Storage...
+  - Keywords: postgresql, localhost, Migration, Tool, pass
+  - Size: 610 chars (~152 tokens)
+- **markdown_section_3db652cd_44** (markdown_section, L44-61)
+  - Summary: ## Environment Setup...
+  - Keywords: Activation, Node, Virtual, venv, bin
+  - Size: 727 chars (~181 tokens)
+- **markdown_section_41efc377_62** (markdown_section, L62-73)
+  - Summary: ## Project Structure Notes...
+  - Keywords: Output, Build, Notes, lib, src
+  - Size: 325 chars (~81 tokens)
+- **markdown_section_368a31bb_74** (markdown_section, L74-85)
+  - Summary: [your install -> setup -> run commands]...
+  - Keywords: testing, bash, setup, test, command
+  - Size: 194 chars (~48 tokens)
+- **markdown_section_d4a0f5d2_86** (markdown_section, L86-89)
+  - Summary: [your build/deploy commands]...
+  - Keywords: here, commands, your, build, Add
+  - Size: 71 chars (~17 tokens)
+
+#### `.github\RAG_CONTEXT.md`
+
+- **markdown_section_28a12fbd_1** (markdown_section, L1-5)
+  - Summary: # RAG_CONTEXT.md - Universal Code Discovery Patterns...
+  - Keywords: RAG_CONTEXT, Universal, Optimized, understanding, quickly
+  - Size: 150 chars (~37 tokens)
+- **markdown_section_136c3118_6** (markdown_section, L6-16)
+  - Summary: 1. **Project Structure** - `find . -type f -name "*.json" -o -name "*.yaml" -o -...
+  - Keywords: order, Structure, find, json, yaml
+  - Size: 475 chars (~118 tokens)
+- **markdown_section_32144fba_17** (markdown_section, L17-21)
+  - Summary: ```bash...
+  - Keywords: grep, func, Find, bash, include
+  - Size: 243 chars (~60 tokens)
+- **markdown_section_25587f41_22** (markdown_section, L22-27)
+  - Summary: grep -r "class \|struct \|interface \|type.*struct\|impl " . --include="*.py" --...
+  - Keywords: grep, Tracking, interface, Find, bash
+  - Size: 216 chars (~54 tokens)
+- **markdown_section_91db3054_28** (markdown_section, L28-33)
+  - Summary: grep -r "import \|require\|from.*import\|use \|#include" . --include="*.py" --in...
+  - Keywords: grep, Find, include, requires, require
+  - Size: 248 chars (~62 tokens)
+- **markdown_section_848d0f89_34** (markdown_section, L34-40)
+  - Summary: grep -r "process\.env\|os\.environ\|ENV\[" . --include="*.py" --include="*.js" -...
+  - Keywords: grep, process, files, find, Find
+  - Size: 233 chars (~58 tokens)
+- **markdown_section_608f87e3_41** (markdown_section, L41-44)
+  - Summary: ```bash...
+  - Keywords: bash, API, Endpoints, Discovery, Architecture
+  - Size: 55 chars (~13 tokens)
+- **markdown_section_f32f9c24_45** (markdown_section, L45-51)
+  - Summary: grep -r "@app\.route\|router\.\|app\.\(get\|post\|put\|delete\)\|@RestController...
+  - Keywords: grep, route, RequestMapping, GraphQL, find
+  - Size: 210 chars (~52 tokens)
+- **markdown_section_4b73967f_52** (markdown_section, L52-56)
+  - Summary: ```bash...
+  - Keywords: grep, Schema, bash, Entity, CREATE
+  - Size: 119 chars (~29 tokens)
+- **markdown_section_37b8269a_57** (markdown_section, L57-62)
+  - Summary: grep -r "connect\|database\|db\.\|session\|query" . --include="*.py" --include="...
+  - Keywords: grep, session, bash, connect, database
+  - Size: 164 chars (~41 tokens)
+- **markdown_section_df340a2a_63** (markdown_section, L63-69)
+  - Summary: find . -name "*.component.*" -o -name "*.vue" -o -name "*Component.js*" -o -name...
+  - Keywords: vue, find, State, grep, name
+  - Size: 300 chars (~75 tokens)
+- **markdown_section_b7190ae3_70** (markdown_section, L70-74)
+  - Summary: ```bash...
+  - Keywords: files, find, spec, bash, name
+  - Size: 113 chars (~28 tokens)
+- **markdown_section_ea6dcb96_75** (markdown_section, L75-80)
+  - Summary: grep -r "describe\|it\|test\|Test\|assert\|expect\|should" . --include="*test*" ...
+  - Keywords: grep, expect, describe, spec, Deploy
+  - Size: 157 chars (~39 tokens)
+- **markdown_section_9a7b993d_81** (markdown_section, L81-86)
+  - Summary: find . -name "*config*" -name "*.json" -o -name "webpack*" -o -name "vite*" -o -...
+  - Keywords: json, find, webpack, name, Build
+  - Size: 232 chars (~58 tokens)
+- **markdown_section_44028ef9_87** (markdown_section, L87-94)
+  - Summary: find . -name "Dockerfile*" -o -name "docker-compose*" -o -name "*.dockerfile"...
+  - Keywords: find, CONTEXT, name, Dockerfile, containerization
+  - Size: 151 chars (~37 tokens)
+- **markdown_section_957faec2_95** (markdown_section, L95-99)
+  - Summary: ```bash...
+  - Keywords: grep, jsx, hierarchy, bash, Component
+  - Size: 183 chars (~45 tokens)
+- **markdown_section_f61d1613_100** (markdown_section, L100-106)
+  - Summary: grep -r "Route\|router\|navigate\|Link to" . --include="*.js" --include="*.ts" -...
+  - Keywords: grep, jsx, Link, State, atom
+  - Size: 280 chars (~70 tokens)
+- **markdown_section_a4e3a527_107** (markdown_section, L107-111)
+  - Summary: ```bash...
+  - Keywords: grep, route, bash, put, Endpoint
+  - Size: 133 chars (~33 tokens)
+- **markdown_section_9cf1bda0_112** (markdown_section, L112-118)
+  - Summary: grep -r "middleware\|@.*Before\|@.*After\|use\(" . --include="*.py" --include="*...
+  - Keywords: grep, Middleware, Before, include, jwt
+  - Size: 250 chars (~62 tokens)
+- **markdown_section_777d78d5_119** (markdown_section, L119-123)
+  - Summary: ```bash...
+  - Keywords: grep, Schema, bash, Entity, CREATE
+  - Size: 118 chars (~29 tokens)
+- **markdown_section_e28da1e1_124** (markdown_section, L124-132)
+  - Summary: grep -r "SELECT\|INSERT\|UPDATE\|DELETE\|query\|find\|save" . --include="*.py" -...
+  - Keywords: grep, INSERT, find, name, save
+  - Size: 224 chars (~56 tokens)
+- **markdown_section_37c1a7aa_133** (markdown_section, L133-140)
+  - Summary: 1. **Entry point** - Find main function/app initialization...
+  - Keywords: INTELLIGENT, Request, Flow, CONTEXT, Find
+  - Size: 318 chars (~79 tokens)
+- **markdown_section_df5d0da1_141** (markdown_section, L141-145)
+  - Summary: ```bash...
+  - Keywords: dependencies, grep, bash, Mapping, target_file
+  - Size: 121 chars (~30 tokens)
+- **markdown_section_10ffd2d6_146** (markdown_section, L146-151)
+  - Summary: grep -r "import.*[module_name]\|from.*[module_name]" . --include="*.py" --includ...
+  - Keywords: module, files, grep, Error, Find
+  - Size: 194 chars (~48 tokens)
+- **markdown_section_d93de12c_152** (markdown_section, L152-160)
+  - Summary: grep -r "try\|catch\|except\|Error\|panic\|Result<" . --include="*.py" --include...
+  - Keywords: grep, debug, Error, Logging, log
+  - Size: 301 chars (~75 tokens)
+- **markdown_section_7135ba02_161** (markdown_section, L161-167)
+  - Summary: - **Components**: `find . -name "*.tsx" -o -name "*.jsx" | head -20`...
+  - Keywords: jsx, find, grep, Context, Hooks
+  - Size: 287 chars (~71 tokens)
+- **markdown_section_a53b7e62_168** (markdown_section, L168-177)
+  - Summary: - **Models**: `grep -r "class.*BaseModel\|class.*Model" . --include="*.py"`...
+  - Keywords: FastAPI, grep, find, schema, Projects
+  - Size: 486 chars (~121 tokens)
+- **markdown_section_e9422383_178** (markdown_section, L178-186)
+  - Summary: - **Modules**: `find . -name "mod.rs" -o -name "lib.rs" -o -name "main.rs"`...
+  - Keywords: grep, find, trait, name, Projects
+  - Size: 258 chars (~64 tokens)
+- **markdown_section_7feb1634_187** (markdown_section, L187-196)
+  - Summary: - **Limit search scope**: Use `--max-depth=3` with find...
+  - Keywords: search, with, max, recent, Codebase
+  - Size: 435 chars (~108 tokens)
+- **markdown_section_ca223d8e_197** (markdown_section, L197-207)
+  - Summary: 1. **Configuration** (understand stack & setup)...
+  - Keywords: Priority, the, does, Context, understand
+  - Size: 426 chars (~106 tokens)
+
+#### `.github\VALIDATION.md`
+
+- **markdown_section_a9fdee8e_1** (markdown_section, L1-5)
+  - Summary: # VALIDATION.md - Universal Quality Checklist...
+  - Keywords: Universal, PRE, MANDATORY, items, before
+  - Size: 135 chars (~33 tokens)
+- **markdown_section_a72222c9_6** (markdown_section, L6-14)
+  - Summary: - [ ] **Unused imports removed** - zero unused import statements...
+  - Keywords: Unused, MANDATORY, functions, variable, declarations
+  - Size: 540 chars (~135 tokens)
+- **markdown_section_b5a6319f_15** (markdown_section, L15-28)
+  - Summary: - [ ] **Unit tests exist** - new functionality has corresponding tests...
+  - Keywords: functionality, has, successfully, new, pass
+  - Size: 724 chars (~181 tokens)
+- **markdown_section_26c250c5_29** (markdown_section, L29-42)
+  - Summary: - [ ] **Local build succeeds** - project builds without errors...
+  - Keywords: resolved, succeeds, work, required, build
+  - Size: 744 chars (~186 tokens)
+- **markdown_section_7af38e96_43** (markdown_section, L43-53)
+  - Summary: - [ ] **Pipeline configured** - CI/CD system is setup and accessible...
+  - Keywords: and, configured, ready, builds, deployed
+  - Size: 385 chars (~96 tokens)
+- **markdown_section_4d75dca3_54** (markdown_section, L54-67)
+  - Summary: - [ ] **TypeScript compilation passes** - `npx tsc --noEmit` succeeds...
+  - Keywords: npx, formatting, applied, Projects, tsc
+  - Size: 758 chars (~189 tokens)
+- **markdown_section_9d09e08e_68** (markdown_section, L68-83)
+  - Summary: - [ ] **Go fmt applied** - code formatted with `gofmt`...
+  - Keywords: fmt, applied, shows, Projects, with
+  - Size: 648 chars (~162 tokens)
+- **markdown_section_170fc24a_84** (markdown_section, L84-92)
+  - Summary: - [ ] **Secrets secured** - no hardcoded passwords/API keys...
+  - Keywords: passwords, production, applied, API, keys
+  - Size: 378 chars (~94 tokens)
+- **markdown_section_47d5b8c5_93** (markdown_section, L93-104)
+  - Summary: - [ ] **Backup created** - database/state backed up before deploy...
+  - Keywords: Backup, created, backed, process, Deploy
+  - Size: 414 chars (~103 tokens)
+- **markdown_section_b8fd8233_105** (markdown_section, L105-117)
+  - Summary: - Unused imports accumulating over time...
+  - Keywords: production, code, over, left, Debug
+  - Size: 439 chars (~109 tokens)
+- **markdown_section_caf1a1f1_118** (markdown_section, L118-133)
+  - Summary: - Missing dependencies in production...
+  - Keywords: dependencies, artifacts, production, Build, Missing
+  - Size: 460 chars (~115 tokens)
+
+#### `.github\agents\AGENT_GUIDE.md`
+
+- **markdown_section_f289054f_1** (markdown_section, L1-4)
+  - Summary: # 🤖 Specialized Agent System - User Guide...
+  - Keywords: assistance, Agent, specialized, focused, System
+  - Size: 147 chars (~36 tokens)
+- **markdown_section_556b2016_5** (markdown_section, L5-15)
+  - Summary: Agents are specialized AI assistants with deep expertise in specific technologie...
+  - Keywords: the, with, agent, expertise, you
+  - Size: 568 chars (~142 tokens)
+- **markdown_section_0a1b41c5_16** (markdown_section, L16-29)
+  - Summary: ## 🚀 Quick Start...
+  - Keywords: technology, the, Kafka, you, with
+  - Size: 366 chars (~91 tokens)
+- **markdown_section_d3fc77b0_30** (markdown_section, L30-36)
+  - Summary: ```bash...
+  - Keywords: Workflow, building, Create, bash, with
+  - Size: 143 chars (~35 tokens)
+- **markdown_section_2d87ecd6_37** (markdown_section, L37-44)
+  - Summary: /agent-docker...
+  - Keywords: you, Deploy, Create, optimized, agent
+  - Size: 192 chars (~48 tokens)
+- **markdown_section_63791b00_45** (markdown_section, L45-51)
+  - Summary: /agent-kafka...
+  - Keywords: Kafka, Capabilities, Publish, agent, event
+  - Size: 105 chars (~26 tokens)
+- **markdown_section_2ede7d70_52** (markdown_section, L52-77)
+  - Summary: - Topic design and partitioning strategies...
+  - Keywords: Kafka, and, design, Schema, partitioning
+  - Size: 770 chars (~192 tokens)
+- **markdown_section_d59483ac_78** (markdown_section, L78-105)
+  - Summary: - Service selection and architecture design...
+  - Keywords: CDK, and, API, architectures, Gateway
+  - Size: 860 chars (~215 tokens)
+- **markdown_section_8b655b8e_106** (markdown_section, L106-133)
+  - Summary: - REST API development and design patterns...
+  - Keywords: and, design, entities, REST, JPA
+  - Size: 848 chars (~212 tokens)
+- **markdown_section_ec41b1b6_134** (markdown_section, L134-162)
+  - Summary: - Microservices architecture patterns...
+  - Keywords: Discovery, Eureka, Consul, API, architecture
+  - Size: 907 chars (~226 tokens)
+- **markdown_section_3d5528a1_163** (markdown_section, L163-189)
+  - Summary: - Dockerfile best practices and optimization...
+  - Keywords: Compose, and, minimal, builds, multi
+  - Size: 817 chars (~204 tokens)
+- **markdown_section_30b02b4e_190** (markdown_section, L190-207)
+  - Summary: ## 🎓 Usage Patterns...
+  - Keywords: these, features, agent, one, User
+  - Size: 392 chars (~98 tokens)
+- **markdown_section_c99fd67f_208** (markdown_section, L208-216)
+  - Summary: Switch agents as you work through your stack:...
+  - Keywords: the, agent, work, stack, API
+  - Size: 174 chars (~43 tokens)
+- **markdown_section_628fc837_217** (markdown_section, L217-224)
+  - Summary: /agent-kafka...
+  - Keywords: messaging, production, Publish, Create, ready
+  - Size: 167 chars (~41 tokens)
+- **markdown_section_b880d48b_225** (markdown_section, L225-234)
+  - Summary: /agent-aws...
+  - Keywords: Deploy, ECS, with, Pattern, bash
+  - Size: 166 chars (~41 tokens)
+- **markdown_section_dc93cdfc_235** (markdown_section, L235-249)
+  - Summary: /agent-springboot...
+  - Keywords: Kafka, Set, the, microservices, best
+  - Size: 287 chars (~71 tokens)
+- **markdown_section_0865545f_250** (markdown_section, L250-266)
+  - Summary: Activate the relevant agent when debugging:...
+  - Keywords: the, Troubleshooting, and, lag, bash
+  - Size: 324 chars (~81 tokens)
+- **markdown_section_3f42b17a_267** (markdown_section, L267-296)
+  - Summary: ```...
+  - Keywords: Specific, and, Optimal, Orders, Then
+  - Size: 499 chars (~124 tokens)
+- **markdown_section_62f9d236_297** (markdown_section, L297-307)
+  - Summary: When technologies interact, switch to the appropriate agent:...
+  - Keywords: the, Kafka, bash, Points, agent
+  - Size: 313 chars (~78 tokens)
+- **markdown_section_d597e841_308** (markdown_section, L308-324)
+  - Summary: ```bash...
+  - Keywords: paste, Agent, Review, bash, best
+  - Size: 358 chars (~89 tokens)
+- **markdown_section_d3c0a215_325** (markdown_section, L325-341)
+  - Summary: ## 🔄 Agent Switching...
+  - Keywords: technology, messaging, Moving, code, deployment
+  - Size: 479 chars (~119 tokens)
+- **markdown_section_925d79ab_342** (markdown_section, L342-349)
+  - Summary: - Deep-diving into one technology...
+  - Keywords: technology, Troubleshooting, Staying, step, one
+  - Size: 200 chars (~50 tokens)
+- **markdown_section_0acf4677_350** (markdown_section, L350-370)
+  - Summary: Use this to choose the right agent:...
+  - Keywords: the, Cloud, Decision, microservices, REST
+  - Size: 593 chars (~148 tokens)
+- **markdown_section_2428b686_371** (markdown_section, L371-375)
+  - Summary: ## 🎯 Real-World Scenarios...
+  - Keywords: Scenario, Real, bash, Microservice, New
+  - Size: 80 chars (~20 tokens)
+- **markdown_section_e1d20f4f_376** (markdown_section, L376-387)
+  - Summary: /agent-springboot...
+  - Keywords: order, CRUD, Create, with, JPA
+  - Size: 278 chars (~69 tokens)
+- **markdown_section_d6327e97_388** (markdown_section, L388-398)
+  - Summary: /agent-docker...
+  - Keywords: production, Create, Containerization, with, Deploy
+  - Size: 239 chars (~59 tokens)
+- **markdown_section_31dcb729_399** (markdown_section, L399-422)
+  - Summary: /agent-springcloud...
+  - Keywords: Eureka, breakers, with, agent, distributed
+  - Size: 478 chars (~119 tokens)
+- **markdown_section_d243efdb_423** (markdown_section, L423-440)
+  - Summary: ```bash...
+  - Keywords: heap, production, likely, agent, OutOfMemoryError
+  - Size: 363 chars (~90 tokens)
+- **markdown_section_b87e99d6_441** (markdown_section, L441-448)
+  - Summary: ## 🚨 Important Notes...
+  - Keywords: agent, specialists, stays, domain, within
+  - Size: 283 chars (~70 tokens)
+- **markdown_section_3bc7f7f0_449** (markdown_section, L449-462)
+  - Summary: 1. **Be specific** with requirements and constraints...
+  - Keywords: the, and, with, code, Ask
+  - Size: 528 chars (~132 tokens)
+- **markdown_section_e5543abd_463** (markdown_section, L463-484)
+  - Summary: 1. **Start with the right agent** - Choose based on primary technology...
+  - Keywords: the, with, based, agent, Version
+  - Size: 957 chars (~239 tokens)
+
+#### `.github\agents\AGENT_TEMPLATE.md`
+
+- **markdown_section_bfb08574_1** (markdown_section, L1-11)
+  - Summary: # 🤖 [TECHNOLOGY] Agent...
+  - Keywords: activated, TECHNOLOGY_NAME, specialized, Core, Specialized
+  - Size: 240 chars (~60 tokens)
+- **markdown_section_31d35d1d_12** (markdown_section, L12-15)
+  - Summary: ## 📚 Core Knowledge...
+  - Keywords: Knowledge, Core, Fundamental, Concepts
+  - Size: 50 chars (~12 tokens)
+- **markdown_section_2ba3f3b5_16** (markdown_section, L16-21)
+  - Summary: Description of concept......
+  - Keywords: concept, Concept, Description
+  - Size: 88 chars (~22 tokens)
+- **markdown_section_61364e47_22** (markdown_section, L22-30)
+  - Summary: ### 2. Architecture Patterns...
+  - Keywords: Case, pattern, example, Pattern, use
+  - Size: 155 chars (~38 tokens)
+- **markdown_section_2199fa37_31** (markdown_section, L31-38)
+  - Summary: 1. **[Practice 1]** - Description...
+  - Keywords: Tasks, Description, Practices, Best, Common
+  - Size: 145 chars (~36 tokens)
+- **markdown_section_0e6ba489_39** (markdown_section, L39-61)
+  - Summary: ### Task 1: [Task Name]...
+  - Keywords: Goal, accomplishes, Steps, language, Step
+  - Size: 254 chars (~63 tokens)
+- **markdown_section_88336c1a_62** (markdown_section, L62-66)
+  - Summary: ## ⚙️ Configuration...
+  - Keywords: Basic, Configuration, format
+  - Size: 58 chars (~14 tokens)
+- **markdown_section_88476825_67** (markdown_section, L67-72)
+  - Summary: ```...
+  - Keywords: Advanced, Configuration, example, format
+  - Size: 69 chars (~17 tokens)
+- **markdown_section_4e47e370_73** (markdown_section, L73-78)
+  - Summary: ```...
+  - Keywords: bash, Variables, config, Environment, Advanced
+  - Size: 58 chars (~14 tokens)
+- **markdown_section_9306649e_79** (markdown_section, L79-85)
+  - Summary: VARIABLE_1=value...
+  - Keywords: Troubleshooting, VARIABLE_1, Required, variables, VARIABLE_2
+  - Size: 94 chars (~23 tokens)
+- **markdown_section_76dfb066_86** (markdown_section, L86-104)
+  - Summary: - Symptom 1...
+  - Keywords: bash, Problem, Solution, Quick, Cause
+  - Size: 212 chars (~53 tokens)
+- **markdown_section_f07af291_105** (markdown_section, L105-109)
+  - Summary: ```...
+  - Keywords: Optimization, Performance, resolve, Commands
+  - Size: 58 chars (~14 tokens)
+- **markdown_section_92802497_110** (markdown_section, L110-130)
+  - Summary: ### Optimization 1: [Optimization Name]...
+  - Keywords: Optimization, Performance, Optimized, Before, Slow
+  - Size: 285 chars (~71 tokens)
+- **markdown_section_d11dc4f1_131** (markdown_section, L131-146)
+  - Summary: 1. **[Security Practice 1]**...
+  - Keywords: Details, Practices, Best, Example, Practice
+  - Size: 223 chars (~55 tokens)
+- **markdown_section_2af19ce0_147** (markdown_section, L147-158)
+  - Summary: ```[language]...
+  - Keywords: Integration, example, language, Unit, test
+  - Size: 130 chars (~32 tokens)
+- **markdown_section_1908646c_159** (markdown_section, L159-166)
+  - Summary: ```[language]...
+  - Keywords: Monitoring, Performance, example, Observability, language
+  - Size: 105 chars (~26 tokens)
+- **markdown_section_8e6e3fe4_167** (markdown_section, L167-178)
+  - Summary: 1. **[Metric 1]** - What it measures...
+  - Keywords: Logging, Best, Practices, language, measures
+  - Size: 207 chars (~51 tokens)
+- **markdown_section_e09660ee_179** (markdown_section, L179-189)
+  - Summary: ## 🔗 Integration Points...
+  - Keywords: Technology, Case, you, with, Points
+  - Size: 158 chars (~39 tokens)
+- **markdown_section_380dd17b_190** (markdown_section, L190-198)
+  - Summary: ```[language]...
+  - Keywords: Technology, with, code, Quick, language
+  - Size: 109 chars (~27 tokens)
+- **markdown_section_eb800db5_199** (markdown_section, L199-204)
+  - Summary: ```bash...
+  - Keywords: bash, example, command, Common, Command
+  - Size: 58 chars (~14 tokens)
+- **markdown_section_a975598d_205** (markdown_section, L205-216)
+  - Summary: command-example...
+  - Keywords: example, Pattern, command, Common, language
+  - Size: 112 chars (~28 tokens)
+- **markdown_section_72d8ada1_217** (markdown_section, L217-229)
+  - Summary: - **Official Docs:** [URL]...
+  - Keywords: Pro, Tutorials, Tips, Docs, Best
+  - Size: 246 chars (~61 tokens)
+- **markdown_section_09329a6f_230** (markdown_section, L230-251)
+  - Summary: 1. ❌ **Mistake 1** - Why it's bad and how to avoid...
+  - Keywords: and, how, Avoid, Mistakes, Why
+  - Size: 518 chars (~129 tokens)
+
+#### `.github\agents\AWS_AGENT.md`
+
+- **markdown_section_08ed506a_1** (markdown_section, L1-4)
+  - Summary: # ☁️ AWS Agent...
+  - Keywords: Agent, Amazon, Services, AWS, Assistant
+  - Size: 69 chars (~17 tokens)
+- **markdown_section_22095f18_5** (markdown_section, L5-18)
+  - Summary: I am a specialized AWS expert. When activated, I focus exclusively on:...
+  - Keywords: CDK, and, Infrastructure, activated, specialized
+  - Size: 559 chars (~139 tokens)
+- **markdown_section_31d35d1d_19** (markdown_section, L19-22)
+  - Summary: ## 📚 Core Knowledge...
+  - Keywords: Knowledge, Core, Fundamental, Concepts
+  - Size: 50 chars (~12 tokens)
+- **markdown_section_1a377dfd_23** (markdown_section, L23-46)
+  - Summary: The 6 pillars for building robust cloud architectures:...
+  - Keywords: and, information, cloud, architectures, The
+  - Size: 740 chars (~185 tokens)
+- **markdown_section_417ad4e5_47** (markdown_section, L47-61)
+  - Summary: ```...
+  - Keywords: Object, POSIX, file, Decision, EFS
+  - Size: 302 chars (~75 tokens)
+- **markdown_section_c545e4dd_62** (markdown_section, L62-66)
+  - Summary: ```yaml...
+  - Keywords: yaml, Case, minimal, request, Pattern
+  - Size: 106 chars (~26 tokens)
+- **markdown_section_25c8cdbc_67** (markdown_section, L67-169)
+  - Summary: AWSTemplateFormatVersion: '2010-09-09'...
+  - Keywords: yaml, Api, OrdersApi, Transform, Properties
+  - Size: 3140 chars (~785 tokens)
+- **markdown_section_3ff1e6ad_170** (markdown_section, L170-174)
+  - Summary: ```yaml...
+  - Keywords: services, yaml, Case, communicating, Pattern
+  - Size: 110 chars (~27 tokens)
+- **markdown_section_4a386f11_175** (markdown_section, L175-262)
+  - Summary: Resources:...
+  - Keywords: Type, Resources, OrderEventBus, Lambda, EventBridge
+  - Size: 2339 chars (~584 tokens)
+- **markdown_section_ba9d472e_263** (markdown_section, L263-409)
+  - Summary: ```yaml...
+  - Keywords: VPC, with, EC2, Application, Type
+  - Size: 3566 chars (~891 tokens)
+- **markdown_section_e1182f90_410** (markdown_section, L410-454)
+  - Summary: 1. **Use Infrastructure as Code** - CloudFormation, CDK, or Terraform for all in...
+  - Keywords: CDK, and, control, all, Version
+  - Size: 1186 chars (~296 tokens)
+- **markdown_section_2d330690_455** (markdown_section, L455-466)
+  - Summary: ## 🔧 Common Tasks...
+  - Keywords: Goal, Deploy, Tasks, ECS, with
+  - Size: 205 chars (~51 tokens)
+- **markdown_section_df0ea4db_467** (markdown_section, L467-472)
+  - Summary: COPY target/app.jar app.jar...
+  - Keywords: COPY, EXPOSE, Copy, target, app
+  - Size: 67 chars (~16 tokens)
+- **markdown_section_ec2ee3d7_473** (markdown_section, L473-476)
+  - Summary: HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \...
+  - Keywords: check, localhost, start, http, Health
+  - Size: 150 chars (~37 tokens)
+- **markdown_section_9b5472cd_477** (markdown_section, L477-561)
+  - Summary: ENTRYPOINT ["java", \...
+  - Keywords: dev, egd, urandom, MaxRAMPercentage, security
+  - Size: 2372 chars (~593 tokens)
+- **markdown_section_f88ea18f_562** (markdown_section, L562-681)
+  - Summary: ```yaml...
+  - Keywords: and, with, Storage, lifecycle, Application
+  - Size: 3464 chars (~866 tokens)
+- **markdown_section_a4944576_682** (markdown_section, L682-828)
+  - Summary: ```yaml...
+  - Keywords: Goal, Set, yaml, DBSubnetGroupDescription, with
+  - Size: 3969 chars (~992 tokens)
+- **markdown_section_9fcf1b2c_829** (markdown_section, L829-833)
+  - Summary: ## ⚙️ Configuration...
+  - Keywords: yaml, SDK, AWS, Boot, Spring
+  - Size: 70 chars (~17 tokens)
+- **markdown_section_2eee9b00_834** (markdown_section, L834-894)
+  - Summary: aws:...
+  - Keywords: secret, https, credentials, name, key
+  - Size: 1489 chars (~372 tokens)
+- **markdown_section_ed3d684f_895** (markdown_section, L895-910)
+  - Summary: ## 🐛 Troubleshooting...
+  - Keywords: ECS, group, immediately, then, targets
+  - Size: 359 chars (~89 tokens)
+- **markdown_section_2b8c9895_911** (markdown_section, L911-916)
+  - Summary: aws logs tail /ecs/app --follow...
+  - Keywords: describe, xxx, group, ecs, Check
+  - Size: 123 chars (~30 tokens)
+- **markdown_section_2ea9c23a_917** (markdown_section, L917-933)
+  - Summary: docker run -p 8080:8080 myapp...
+  - Keywords: check, localhost, http, EC2, locally
+  - Size: 374 chars (~93 tokens)
+- **markdown_section_4c575fae_934** (markdown_section, L934-979)
+  - Summary: - First requests take 5-10 seconds...
+  - Keywords: requests, Provisioned, Type, Timeouts, Lambda
+  - Size: 1008 chars (~252 tokens)
+- **markdown_section_e0c5a3fe_980** (markdown_section, L980-999)
+  - Summary: - Unexpected monthly bills...
+  - Keywords: database, bills, aws, High, size
+  - Size: 451 chars (~112 tokens)
+- **markdown_section_26a45692_1000** (markdown_section, L1000-1020)
+  - Summary: ```...
+  - Keywords: AuroraCluster, Engine, instance, Type, downsize
+  - Size: 455 chars (~113 tokens)
+- **markdown_section_82b68cca_1021** (markdown_section, L1021-1022)
+  - Summary: ## 🚀 Performance Optimization...
+  - Keywords: Optimization, Performance
+  - Size: 30 chars (~7 tokens)
+- **markdown_section_bf35a593_1023** (markdown_section, L1023-1051)
+  - Summary: ```yaml...
+  - Keywords: Optimization, yaml, Distribution, users, latency
+  - Size: 844 chars (~211 tokens)
+- **markdown_section_3357a8a3_1052** (markdown_section, L1052-1128)
+  - Summary: ```yaml...
+  - Keywords: Optimization, yaml, CacheSubnetGroup, SubnetIds, ElastiCache
+  - Size: 2189 chars (~547 tokens)
+- **markdown_section_da376e0a_1129** (markdown_section, L1129-1130)
+  - Summary: ## 🔒 Security Best Practices...
+  - Keywords: Practices, Best, Security
+  - Size: 29 chars (~7 tokens)
+- **markdown_section_181aaf56_1131** (markdown_section, L1131-1165)
+  - Summary: ```yaml...
+  - Keywords: yaml, Statement, Tasks, ECS, IAM
+  - Size: 918 chars (~229 tokens)
+- **markdown_section_c8201d54_1166** (markdown_section, L1166-1201)
+  - Summary: ```java...
+  - Keywords: secretsManagerClient, SecretsManagerClient, Bean, Manager, java
+  - Size: 1039 chars (~259 tokens)
+- **markdown_section_b6335785_1202** (markdown_section, L1202-1216)
+  - Summary: ```yaml...
+  - Keywords: VPC, traffic, EC2, Application, Security
+  - Size: 383 chars (~95 tokens)
+- **markdown_section_0a1d711b_1217** (markdown_section, L1217-1231)
+  - Summary: DBSecurityGroup:...
+  - Keywords: VPC, traffic, accept, DBSecurityGroup, SecurityGroup
+  - Size: 387 chars (~96 tokens)
+- **markdown_section_daa4ed47_1232** (markdown_section, L1232-1233)
+  - Summary: ## 📊 Monitoring & Observability...
+  - Keywords: Monitoring, Observability
+  - Size: 32 chars (~8 tokens)
+- **markdown_section_02f5bfb3_1234** (markdown_section, L1234-1271)
+  - Summary: ```yaml...
+  - Keywords: yaml, CloudWatch, ApplicationDashboard, DashboardName, ECS
+  - Size: 978 chars (~244 tokens)
+- **markdown_section_d8e7263a_1272** (markdown_section, L1272-1312)
+  - Summary: ```yaml...
+  - Keywords: High, yaml, CloudWatch, ECS, AlarmName
+  - Size: 941 chars (~235 tokens)
+- **markdown_section_269b8dcb_1313** (markdown_section, L1313-1331)
+  - Summary: 1. **Use AWS CDK for Type-Safe IaC** - Better than raw CloudFormation...
+  - Keywords: CDK, Type, than, Enable, Cost
+  - Size: 891 chars (~222 tokens)
+- **markdown_section_0ffa9ab9_1332** (markdown_section, L1332-1353)
+  - Summary: - [ ] Multi-AZ deployment configured...
+  - Keywords: and, transit, deployment, follow, privilege
+  - Size: 666 chars (~166 tokens)
+
+#### `.github\agents\CODE_CONSOLIDATOR_AGENT.md`
+
+- **markdown_section_9c86d1b3_1** (markdown_section, L1-4)
+  - Summary: # 🔧 Code Consolidator Agent...
+  - Keywords: and, Executing, Specialized, Safe, Assistant
+  - Size: 108 chars (~27 tokens)
+- **markdown_section_4cc166c5_5** (markdown_section, L5-15)
+  - Summary: I am a specialized Code Consolidator. When activated, I focus exclusively on:...
+  - Keywords: with, code, dead, Consolidator, activated
+  - Size: 615 chars (~153 tokens)
+- **markdown_section_31d35d1d_16** (markdown_section, L16-19)
+  - Summary: ## 📚 Core Knowledge...
+  - Keywords: Knowledge, Core, Fundamental, Concepts
+  - Size: 50 chars (~12 tokens)
+- **markdown_section_e2481e9f_20** (markdown_section, L20-39)
+  - Summary: 1. **Pre-removal validation** - Tests pass, functionality documented...
+  - Keywords: Verification, code, Delete, The, documented
+  - Size: 715 chars (~178 tokens)
+- **markdown_section_4a7e21bd_40** (markdown_section, L40-50)
+  - Summary: ```python...
+  - Keywords: Before, Operations, defaultdict, python, sys
+  - Size: 211 chars (~52 tokens)
+- **markdown_section_29e32531_51** (markdown_section, L51-66)
+  - Summary: import sys...
+  - Keywords: utils, helper, sys, Dead, List
+  - Size: 267 chars (~66 tokens)
+- **markdown_section_cb2a9ae2_67** (markdown_section, L67-74)
+  - Summary: def active_function():...
+  - Keywords: files, Before, with, python, Duplicate
+  - Size: 130 chars (~32 tokens)
+- **markdown_section_605123cb_75** (markdown_section, L75-84)
+  - Summary: def process_user(user):...
+  - Keywords: order, file_a, validate, process_user, user
+  - Size: 203 chars (~50 tokens)
+- **markdown_section_43d1f17a_85** (markdown_section, L85-90)
+  - Summary: def process_entity(entity):...
+  - Keywords: validate, utils, transform, After, processing
+  - Size: 138 chars (~34 tokens)
+- **markdown_section_949ed81a_91** (markdown_section, L91-110)
+  - Summary: from utils.processing import process_entity...
+  - Keywords: file_a, utils, Pattern, process_user, user
+  - Size: 508 chars (~127 tokens)
+- **markdown_section_b8551418_111** (markdown_section, L111-112)
+  - Summary: ### 2. Architecture Patterns...
+  - Keywords: Patterns, Architecture
+  - Size: 29 chars (~7 tokens)
+- **markdown_section_8e73641d_113** (markdown_section, L113-143)
+  - Summary: ```...
+  - Keywords: LOW, large, code, dead, Case
+  - Size: 752 chars (~188 tokens)
+
+#### `BUILD_CHECKLIST.md`
+
+- **markdown_section_e84a8f60_1** (markdown_section, L1-6)
+  - Summary: # ✅ Build & Deployment Checklist...
+  - Keywords: the, before, Build, Checklist, Deployment
+  - Size: 117 chars (~29 tokens)
+- **markdown_section_7fcc44b5_7** (markdown_section, L7-18)
+  - Summary: - [ ] Docker installed (v19.03+)...
+  - Keywords: v19, files, base, Internet, image
+  - Size: 333 chars (~83 tokens)
+- **markdown_section_a8ce8955_19** (markdown_section, L19-26)
+  - Summary: ```bash...
+  - Keywords: chmod, Make, bash, File, run
+  - Size: 128 chars (~32 tokens)
+- **markdown_section_2cdaed39_27** (markdown_section, L27-45)
+  - Summary: ## Build Process...
+  - Keywords: Manual, powershell, bash, Build, Run
+  - Size: 226 chars (~56 tokens)
+- **markdown_section_accbb561_46** (markdown_section, L46-57)
+  - Summary: - [ ] Build completes without errors...
+  - Keywords: completes, Success, All, cached, docker
+  - Size: 239 chars (~59 tokens)
+- **markdown_section_9d996e27_58** (markdown_section, L58-76)
+  - Summary: - [ ] Container starts successfully...
+  - Keywords: Functionality, Scripts, are, git, message
+  - Size: 490 chars (~122 tokens)
+- **markdown_section_929f20de_77** (markdown_section, L77-91)
+  - Summary: - [ ] Init script runs without errors...
+  - Keywords: created, runs, All, files, file
+  - Size: 383 chars (~95 tokens)
+- **markdown_section_a2f576e9_92** (markdown_section, L92-98)
+  - Summary: ls -la output/test-project/.github/...
+  - Keywords: files, Documentation, project, output, Checks
+  - Size: 108 chars (~27 tokens)
+- **markdown_section_4418724d_99** (markdown_section, L99-113)
+  - Summary: - [ ] README.md (comprehensive)...
+  - Keywords: sharing, Files, docs, comprehensive, README
+  - Size: 527 chars (~131 tokens)
+- **markdown_section_332e344d_114** (markdown_section, L114-124)
+  - Summary: - [ ] docker-run.sh (Linux/Mac wrapper)...
+  - Keywords: scripts, project, Windows, init, Linux
+  - Size: 334 chars (~83 tokens)
+- **markdown_section_4dfd964a_125** (markdown_section, L125-136)
+  - Summary: - [ ] Docker build succeeds...
+  - Keywords: macOS, succeeds, execute, work, works
+  - Size: 260 chars (~65 tokens)
+- **markdown_section_6790b2aa_137** (markdown_section, L137-144)
+  - Summary: - [ ] Docker build succeeds...
+  - Keywords: confirmed, succeeds, execute, Windows, works
+  - Size: 167 chars (~41 tokens)
+- **markdown_section_6e91eb94_145** (markdown_section, L145-153)
+  - Summary: - [ ] Claude (Claude Code)...
+  - Keywords: Tested, All, With, file, Claude
+  - Size: 215 chars (~53 tokens)
+- **markdown_section_c862764f_154** (markdown_section, L154-160)
+  - Summary: grep -r "@claude" .github/ 2>/dev/null || echo "✓ No Claude-specific syntax"...
+  - Keywords: grep, gpt, dev, Check, specific
+  - Size: 217 chars (~54 tokens)
+- **markdown_section_5c6a7644_161** (markdown_section, L161-172)
+  - Summary: ```bash...
+  - Keywords: gzip, created, Image, Create, bash
+  - Size: 271 chars (~67 tokens)
+- **markdown_section_43c39663_173** (markdown_section, L173-197)
+  - Summary: docker rmi universal-context-template:latest...
+  - Keywords: rmi, latest, images, Test, loading
+  - Size: 602 chars (~150 tokens)
+- **markdown_section_3aea2fdd_198** (markdown_section, L198-208)
+  - Summary: Create distribution package with:...
+  - Keywords: Recipients, section, information, with, Contact
+  - Size: 228 chars (~57 tokens)
+- **markdown_section_1c6f13bc_209** (markdown_section, L209-218)
+  - Summary: - [ ] No API keys in files...
+  - Keywords: data, files, passwords, information, bash
+  - Size: 212 chars (~53 tokens)
+- **markdown_section_5d0c552d_219** (markdown_section, L219-224)
+  - Summary: find . -type f -exec grep -l "api_key\|password\|secret\|token" {} \; 2>/dev/nul...
+  - Keywords: grep, Basic, check, find, secret
+  - Size: 152 chars (~38 tokens)
+- **markdown_section_14e6d1e7_225** (markdown_section, L225-230)
+  - Summary: docker scan universal-context-template:latest...
+  - Keywords: Performance, image, latest, scan, available
+  - Size: 107 chars (~26 tokens)
+- **markdown_section_ccd30406_231** (markdown_section, L231-241)
+  - Summary: - [ ] Image < 300MB uncompressed...
+  - Keywords: Optimization, unnecessary, files, Image, layer
+  - Size: 271 chars (~67 tokens)
+- **markdown_section_7b01f343_242** (markdown_section, L242-248)
+  - Summary: - [ ] Container starts < 2 seconds...
+  - Keywords: Container, starts, Performance, fast, Validation
+  - Size: 139 chars (~34 tokens)
+- **markdown_section_ad924107_249** (markdown_section, L249-259)
+  - Summary: 1. **Distribute**...
+  - Keywords: Workflow, Distribute, bash, Receive, Test
+  - Size: 158 chars (~39 tokens)
+- **markdown_section_f3e10719_260** (markdown_section, L260-273)
+  - Summary: docker load < universal-context-template.tar.gz...
+  - Keywords: bash, project, creation, output, loading
+  - Size: 299 chars (~74 tokens)
+- **markdown_section_392947fb_274** (markdown_section, L274-290)
+  - Summary: ls -la test-output/my-test-project/...
+  - Keywords: bash, cat, project, Cleanup, Check
+  - Size: 341 chars (~85 tokens)
+- **markdown_section_6d1f5a81_291** (markdown_section, L291-302)
+  - Summary: ```bash...
+  - Keywords: the, Universal, Context, bash, release
+  - Size: 240 chars (~60 tokens)
+- **markdown_section_02703d2c_303** (markdown_section, L303-310)
+  - Summary: - [ ] CHANGELOG.md updated...
+  - Keywords: and, stamps, Documentation, current, Version
+  - Size: 156 chars (~39 tokens)
+- **markdown_section_c2b6081d_311** (markdown_section, L311-324)
+  - Summary: - [ ] Test build from scratch...
+  - Keywords: Contents, support, Before, scratch, file
+  - Size: 339 chars (~84 tokens)
+- **markdown_section_1c89fca7_325** (markdown_section, L325-333)
+  - Summary: - [ ] Send to recipients...
+  - Keywords: assistance, links, support, setup, Send
+  - Size: 180 chars (~45 tokens)
+- **markdown_section_a1470be7_334** (markdown_section, L334-347)
+  - Summary: - [ ] Track downloads/usage...
+  - Keywords: Document, requests, Monitor, updates, Support
+  - Size: 312 chars (~78 tokens)
+- **markdown_section_8560d8d5_348** (markdown_section, L348-365)
+  - Summary: ## Sign-Off...
+  - Keywords: Sign, Build, Version, Distribution, _________________
+  - Size: 325 chars (~81 tokens)
+- **markdown_section_d0489139_366** (markdown_section, L366-371)
+  - Summary: ./test-build.sh...
+  - Keywords: and, Build, latest, only, docker
+  - Size: 109 chars (~27 tokens)
+- **markdown_section_2cc61c2e_372** (markdown_section, L372-377)
+  - Summary: make test...
+  - Keywords: save, Quick, make, Save, distribution
+  - Size: 59 chars (~14 tokens)
+- **markdown_section_2c680fe0_378** (markdown_section, L378-390)
+  - Summary: make init NAME=test-project...
+  - Keywords: Initialize, project, init, make, Status
+  - Size: 249 chars (~62 tokens)
+
+#### `DEPLOYMENT_READY.md`
+
+- **markdown_section_5c13b3a4_1** (markdown_section, L1-6)
+  - Summary: # 🚀 DEPLOYMENT READY - Universal Context Template...
+  - Keywords: enabled, Universal, Context, ready, Template
+  - Size: 149 chars (~37 tokens)
+- **markdown_section_047bbd8c_7** (markdown_section, L7-33)
+  - Summary: ```...
+  - Keywords: optimized, based, deployment, Clean, Easy
+  - Size: 836 chars (~209 tokens)
+- **markdown_section_8ba60e5b_34** (markdown_section, L34-59)
+  - Summary: - `README.md` - Main documentation (updated)...
+  - Keywords: deployment, minute, Main, Complete, User
+  - Size: 731 chars (~182 tokens)
+- **markdown_section_08334d4c_60** (markdown_section, L60-78)
+  - Summary: ## 🎯 Key Features...
+  - Keywords: Universal, with, ANY, API, ChatGPT
+  - Size: 442 chars (~110 tokens)
+- **markdown_section_5198cc60_79** (markdown_section, L79-101)
+  - Summary: - ✅ Linux (Ubuntu, Debian, Fedora, etc.)...
+  - Keywords: methods, Platform, Tested, Ubuntu, etc
+  - Size: 485 chars (~121 tokens)
+- **markdown_section_152701d1_102** (markdown_section, L102-106)
+  - Summary: ## 🚀 How to Deploy...
+  - Keywords: the, Image, Deploy, bash, Build
+  - Size: 52 chars (~13 tokens)
+- **markdown_section_2014fbcb_107** (markdown_section, L107-114)
+  - Summary: ./test-build.sh          # Linux/Mac...
+  - Keywords: and, manual, Quick, latest, Windows
+  - Size: 165 chars (~41 tokens)
+- **markdown_section_44fdf6d5_115** (markdown_section, L115-122)
+  - Summary: ```bash...
+  - Keywords: bash, Run, make, comprehensive, Test
+  - Size: 140 chars (~35 tokens)
+- **markdown_section_6d5e59bb_123** (markdown_section, L123-128)
+  - Summary: ```bash...
+  - Keywords: gzip, Create, bash, save, latest
+  - Size: 158 chars (~39 tokens)
+- **markdown_section_d936661f_129** (markdown_section, L129-134)
+  - Summary: make save...
+  - Keywords: share, ready, file, save, make
+  - Size: 70 chars (~17 tokens)
+- **markdown_section_7ac62585_135** (markdown_section, L135-157)
+  - Summary: - Share `universal-context-template.tar.gz`...
+  - Keywords: Distribute, Send, Share, docker, contact
+  - Size: 466 chars (~116 tokens)
+- **markdown_section_956928e1_158** (markdown_section, L158-171)
+  - Summary: Recipients run:...
+  - Keywords: Recipients, engineering, Complete, All, docker
+  - Size: 267 chars (~66 tokens)
+- **markdown_section_fce7b5c8_172** (markdown_section, L172-194)
+  - Summary: Recipients run:...
+  - Keywords: Recipients, bash, latest, project, init
+  - Size: 588 chars (~147 tokens)
+- **markdown_section_757b0b74_195** (markdown_section, L195-199)
+  - Summary: ## 🔥 Usage Examples...
+  - Keywords: Distributors, Usage, Examples, bash
+  - Size: 51 chars (~12 tokens)
+- **markdown_section_8073a8e1_200** (markdown_section, L200-205)
+  - Summary: ./test-build.sh...
+  - Keywords: and, Build, save, make, Save
+  - Size: 64 chars (~16 tokens)
+- **markdown_section_cc4f8fb5_206** (markdown_section, L206-209)
+  - Summary: ```...
+  - Keywords: the, Recipients, file, download, tar
+  - Size: 63 chars (~15 tokens)
+- **markdown_section_f0b7e03f_210** (markdown_section, L210-215)
+  - Summary: ```bash...
+  - Keywords: Recipients, image, bash, tar, context
+  - Size: 91 chars (~22 tokens)
+- **markdown_section_a463d733_216** (markdown_section, L216-225)
+  - Summary: docker run --rm -v $(pwd)/output:/output \...
+  - Keywords: Start, Initialize, bash, project, latest
+  - Size: 242 chars (~60 tokens)
+- **markdown_section_3d4ff4a1_226** (markdown_section, L226-232)
+  - Summary: ```bash...
+  - Keywords: bash, Super, project, init, Windows
+  - Size: 145 chars (~36 tokens)
+- **markdown_section_bcb5c4be_233** (markdown_section, L233-237)
+  - Summary: ```...
+  - Keywords: Model, Usage, Agnostic, Done
+  - Size: 40 chars (~10 tokens)
+- **markdown_section_30f7b967_238** (markdown_section, L238-245)
+  - Summary: ```bash...
+  - Keywords: bash, project, code, init, Claude
+  - Size: 88 chars (~22 tokens)
+- **markdown_section_331590b5_246** (markdown_section, L246-253)
+  - Summary: ```bash...
+  - Keywords: files, Upload, bash, PLANNING, CLAUDE
+  - Size: 108 chars (~27 tokens)
+- **markdown_section_5811715a_254** (markdown_section, L254-260)
+  - Summary: cat .github/*.md PLANNING.md | pbcopy...
+  - Keywords: pbcopy, paste, GitHub, bash, cat
+  - Size: 102 chars (~25 tokens)
+- **markdown_section_628c90a8_261** (markdown_section, L261-265)
+  - Summary: code my-project...
+  - Keywords: workspace, project, code, automatically, Code
+  - Size: 100 chars (~25 tokens)
+- **markdown_section_7addc921_266** (markdown_section, L266-274)
+  - Summary: ```bash...
+  - Keywords: bash, example, ollama, codellama, Models
+  - Size: 167 chars (~41 tokens)
+- **markdown_section_27fca624_275** (markdown_section, L275-281)
+  - Summary: - First build: ~3-5 minutes...
+  - Keywords: Performance, Build, Test, Times, Metrics
+  - Size: 131 chars (~32 tokens)
+- **markdown_section_3a61de27_282** (markdown_section, L282-292)
+  - Summary: - Docker image (uncompressed): 200-300 MB...
+  - Keywords: Container, files, Performance, start, image
+  - Size: 289 chars (~72 tokens)
+- **markdown_section_b0172bde_293** (markdown_section, L293-301)
+  - Summary: - ✅ No secrets in images...
+  - Keywords: secrets, data, attack, image, Alpine
+  - Size: 180 chars (~45 tokens)
+- **markdown_section_fef72396_302** (markdown_section, L302-310)
+  - Summary: - ✅ Comprehensive test suite...
+  - Keywords: Cross, reproducible, Documentation, Verification, Build
+  - Size: 182 chars (~45 tokens)
+- **markdown_section_233488da_311** (markdown_section, L311-316)
+  - Summary: ```bash...
+  - Keywords: ready, bash, Health, Quick, Check
+  - Size: 86 chars (~21 tokens)
+- **markdown_section_ef482b9a_317** (markdown_section, L317-323)
+  - Summary: docker build -t universal-context-template:latest ....
+  - Keywords: Container, image, bash, Build, latest
+  - Size: 171 chars (~42 tokens)
+- **markdown_section_98b09757_324** (markdown_section, L324-331)
+  - Summary: docker run --rm -v $(pwd)/test-output:/output \...
+  - Keywords: bash, latest, project, init, output
+  - Size: 194 chars (~48 tokens)
+- **markdown_section_a134c60d_332** (markdown_section, L332-343)
+  - Summary: rm -rf test-output...
+  - Keywords: runs, bash, all, Windows, Suite
+  - Size: 226 chars (~56 tokens)
+- **markdown_section_6393eaa6_344** (markdown_section, L344-362)
+  - Summary: ## 📈 Next Steps...
+  - Keywords: with, Send, Next, Distribution, Share
+  - Size: 279 chars (~69 tokens)
+- **markdown_section_c5e67696_363** (markdown_section, L363-379)
+  - Summary: - [ ] Add more example templates...
+  - Keywords: web, Create, example, Build, based
+  - Size: 378 chars (~94 tokens)
+- **markdown_section_9bb62f0d_380** (markdown_section, L380-389)
+  - Summary: - `README.md` - Main guide...
+  - Keywords: Main, Fast, Resources, Support, start
+  - Size: 286 chars (~71 tokens)
+- **markdown_section_a86a758f_390** (markdown_section, L390-397)
+  - Summary: - `./docker-run.sh` or `.\docker-run.ps1` - Easy commands...
+  - Keywords: Show, all, Run, Quick, make
+  - Size: 178 chars (~44 tokens)
+- **markdown_section_0c6f6978_398** (markdown_section, L398-420)
+  - Summary: docker build -t universal-context-template:latest ....
+  - Keywords: save, Most, latest, make, commands
+  - Size: 538 chars (~134 tokens)
+- **markdown_section_ddecef44_421** (markdown_section, L421-441)
+  - Summary: - ✅ Production-ready Docker distribution...
+  - Keywords: with, ANY, distribution, compatible, Professional
+  - Size: 502 chars (~125 tokens)
+- **markdown_section_63d96922_442** (markdown_section, L442-458)
+  - Summary: ```bash...
+  - Keywords: and, Version, Updated, one, test
+  - Size: 321 chars (~80 tokens)
+
+#### `DISTRIBUTION_GUIDE.md`
+
+- **markdown_section_ea2fbbda_1** (markdown_section, L1-6)
+  - Summary: Complete guide for distributing this context engineering system to other users....
+  - Keywords: Universal, Context, Template, Guide, Options
+  - Size: 161 chars (~40 tokens)
+- **markdown_section_673878f2_7** (markdown_section, L7-56)
+  - Summary: ### Option 1: Docker Image (Recommended)...
+  - Keywords: Image, issues, one, file, included
+  - Size: 1203 chars (~300 tokens)
+- **markdown_section_cdfcf81b_57** (markdown_section, L57-82)
+  - Summary: ### Option 2: Docker Hub (Public/Private Registry)...
+  - Keywords: and, Steps, bash, Login, push
+  - Size: 638 chars (~159 tokens)
+- **markdown_section_6b6fe7d0_83** (markdown_section, L83-116)
+  - Summary: ### Option 3: Git Repository...
+  - Keywords: Initialize, Steps, bash, control, Best
+  - Size: 894 chars (~223 tokens)
+- **markdown_section_d545ae6d_117** (markdown_section, L117-144)
+  - Summary: ### Option 4: Direct Folder Copy...
+  - Keywords: the, sharing, Direct, Quick, local
+  - Size: 669 chars (~167 tokens)
+- **markdown_section_3da4ab14_145** (markdown_section, L145-149)
+  - Summary: ## 🚀 Quick Distribution Commands...
+  - Keywords: Maintainers, bash, Quick, Distribution, Commands
+  - Size: 63 chars (~15 tokens)
+- **markdown_section_46d4fe29_150** (markdown_section, L150-155)
+  - Summary: make build...
+  - Keywords: Build, make, works, everything, Test
+  - Size: 58 chars (~14 tokens)
+- **markdown_section_6e81dbfb_156** (markdown_section, L156-159)
+  - Summary: make save...
+  - Keywords: Creates, save, make, Save, tar
+  - Size: 80 chars (~20 tokens)
+- **markdown_section_6aad1adb_160** (markdown_section, L160-165)
+  - Summary: ```...
+  - Keywords: preferred, Upload, Recipients, bash, method
+  - Size: 75 chars (~18 tokens)
+- **markdown_section_cce4b112_166** (markdown_section, L166-171)
+  - Summary: docker load < context-template.tar.gz...
+  - Keywords: the, image, tar, gunzip, compressed
+  - Size: 124 chars (~31 tokens)
+- **markdown_section_dd56ea41_172** (markdown_section, L172-180)
+  - Summary: docker run --rm -v $(pwd)/output:/output \...
+  - Keywords: Initialize, bash, project, latest, init
+  - Size: 233 chars (~58 tokens)
+- **markdown_section_5dd3c647_181** (markdown_section, L181-202)
+  - Summary: Before sharing, ensure:...
+  - Keywords: Distribution, sharing, All, ensure, data
+  - Size: 556 chars (~139 tokens)
+- **markdown_section_3b6114fc_203** (markdown_section, L203-213)
+  - Summary: ## 🔒 Security Considerations...
+  - Keywords: secrets, data, Database, credentials, information
+  - Size: 191 chars (~47 tokens)
+- **markdown_section_ba8a0799_214** (markdown_section, L214-230)
+  - Summary: - ✅ Template files...
+  - Keywords: dependencies, files, and, Include, sure
+  - Size: 409 chars (~102 tokens)
+- **markdown_section_ab642016_231** (markdown_section, L231-240)
+  - Summary: ## 🤝 Sharing Best Practices...
+  - Keywords: releases, Create, with, numbers, Practices
+  - Size: 272 chars (~68 tokens)
+- **markdown_section_a543566f_241** (markdown_section, L241-256)
+  - Summary: 1. Use company file server or SharePoint...
+  - Keywords: wiki, Document, Distribution, team, training
+  - Size: 399 chars (~99 tokens)
+- **markdown_section_07dbed3d_257** (markdown_section, L257-261)
+  - Summary: ## 🔄 Version Management...
+  - Keywords: bash, Versioning, Version, Semantic, Management
+  - Size: 58 chars (~14 tokens)
+- **markdown_section_96c2b70a_262** (markdown_section, L262-270)
+  - Summary: docker tag context-template:latest context-template:1.0.0  # Specific version...
+  - Keywords: Specific, latest, tag, Minor, versions
+  - Size: 332 chars (~83 tokens)
+- **markdown_section_5166f45b_271** (markdown_section, L271-275)
+  - Summary: ```markdown...
+  - Keywords: Template, Version, Change, Log, markdown
+  - Size: 67 chars (~16 tokens)
+- **markdown_section_ca9a4736_276** (markdown_section, L276-283)
+  - Summary: - New command for X...
+  - Keywords: Added, framework, command, Improved, Updated
+  - Size: 121 chars (~30 tokens)
+- **markdown_section_f5eac3e4_284** (markdown_section, L284-298)
+  - Summary: - Bug in script A...
+  - Keywords: and, features, with, Number, Distribution
+  - Size: 224 chars (~56 tokens)
+- **markdown_section_75d18e83_299** (markdown_section, L299-308)
+  - Summary: ## 💬 Support Strategy...
+  - Keywords: Troubleshooting, document, Comprehensive, projects, Example
+  - Size: 154 chars (~38 tokens)
+- **markdown_section_3eb4f2bb_309** (markdown_section, L309-324)
+  - Summary: 1. GitHub Issues...
+  - Keywords: Reddit, Discord, Stack, support, Slack
+  - Size: 244 chars (~61 tokens)
+- **markdown_section_a4976dc3_325** (markdown_section, L325-337)
+  - Summary: Track these to measure adoption:...
+  - Keywords: these, Number, forks, requests, Success
+  - Size: 261 chars (~65 tokens)
+- **markdown_section_672fa6fc_338** (markdown_section, L338-345)
+  - Summary: ```bash...
+  - Keywords: scripts, bash, Solution, project, init
+  - Size: 156 chars (~39 tokens)
+- **markdown_section_ee20e638_346** (markdown_section, L346-353)
+  - Summary: ```bash...
+  - Keywords: Permission, chmod, Administrator, bash, Solution
+  - Size: 123 chars (~30 tokens)
+- **markdown_section_c89f4ab4_354** (markdown_section, L354-368)
+  - Summary: ```bash...
+  - Keywords: gzip, Image, image, bash, Solution
+  - Size: 281 chars (~70 tokens)
+- **markdown_section_b9a7668b_369** (markdown_section, L369-393)
+  - Summary: For large organizations:...
+  - Keywords: bash, com, large, tag, Distribution
+  - Size: 568 chars (~142 tokens)
+- **markdown_section_08f6e748_394** (markdown_section, L394-425)
+  - Summary: Create these for recipients:...
+  - Keywords: the, these, Quick, project, templates
+  - Size: 781 chars (~195 tokens)
+- **markdown_section_90614f28_426** (markdown_section, L426-443)
+  - Summary: If you need help distributing:...
+  - Keywords: you, Review, best, documentation, Check
+  - Size: 355 chars (~88 tokens)
+
+#### `MANIFEST.md`
+
+- **markdown_section_7e2c43f1_1** (markdown_section, L1-13)
+  - Summary: # 📋 Project Manifest...
+  - Keywords: Universal, Context, image, Template, File
+  - Size: 371 chars (~92 tokens)
+- **markdown_section_0f2337dd_14** (markdown_section, L14-23)
+  - Summary: ```...
+  - Keywords: project, Comprehensive, init, Docker, Automation
+  - Size: 281 chars (~70 tokens)
+- **markdown_section_7381c40f_24** (markdown_section, L24-32)
+  - Summary: ```...
+  - Keywords: project, Windows, Docker, build, init
+  - Size: 256 chars (~64 tokens)
+- **markdown_section_f9c5eaee_33** (markdown_section, L33-49)
+  - Summary: ```...
+  - Keywords: share, MANIFEST, documentation, Primary, minute
+  - Size: 617 chars (~154 tokens)
+- **markdown_section_214d649c_50** (markdown_section, L50-56)
+  - Summary: ```...
+  - Keywords: Automated, Context, workflows, pipeline, NEW
+  - Size: 135 chars (~33 tokens)
+- **markdown_section_66fdc47d_57** (markdown_section, L57-67)
+  - Summary: ```...
+  - Keywords: Context, Navigation, Technical, PLANNING, Core
+  - Size: 362 chars (~90 tokens)
+- **markdown_section_cf8a9006_68** (markdown_section, L68-91)
+  - Summary: ```...
+  - Keywords: approve, total, snapshot, agent, enforce
+  - Size: 991 chars (~247 tokens)
+- **markdown_section_6ea45a28_92** (markdown_section, L92-107)
+  - Summary: ```...
+  - Keywords: code, chunking_strategy, chunking, config, memory_service
+  - Size: 501 chars (~125 tokens)
+- **markdown_section_480846f7_108** (markdown_section, L108-115)
+  - Summary: ```...
+  - Keywords: new, lines, Documentation, Template, usage
+  - Size: 236 chars (~59 tokens)
+- **markdown_section_31b4ca18_116** (markdown_section, L116-150)
+  - Summary: ```...
+  - Keywords: Expert, Kafka, Amazon, lines, total
+  - Size: 1719 chars (~429 tokens)
+- **markdown_section_58ec94db_151** (markdown_section, L151-175)
+  - Summary: ```...
+  - Keywords: json, txt, dependencies, Python, dev
+  - Size: 654 chars (~163 tokens)
+- **markdown_section_1b4f5dea_176** (markdown_section, L176-189)
+  - Summary: ```...
+  - Keywords: json, installer, settings, Installation, claude
+  - Size: 302 chars (~75 tokens)
+- **markdown_section_eac76025_190** (markdown_section, L190-202)
+  - Summary: - **Docker:** 4 files...
+  - Keywords: files, Scripts, Context, Documentation, RAG
+  - Size: 385 chars (~96 tokens)
+- **markdown_section_322b6642_203** (markdown_section, L203-214)
+  - Summary: - **Markdown Documentation:** ~16,000+ lines (includes 6000+ from agents)...
+  - Keywords: Markdown, includes, lines, Documentation, Python
+  - Size: 434 chars (~108 tokens)
+- **markdown_section_ecd522b4_215** (markdown_section, L215-224)
+  - Summary: ```...
+  - Keywords: Key, Case, BUILD_CHECKLIST, Windows, build
+  - Size: 276 chars (~69 tokens)
+- **markdown_section_0fe29d5c_225** (markdown_section, L225-239)
+  - Summary: ```...
+  - Keywords: file, Distribution, How, DEPLOYMENT_READY, End
+  - Size: 429 chars (~107 tokens)
+- **markdown_section_ec2784e3_240** (markdown_section, L240-249)
+  - Summary: ```...
+  - Keywords: Dev, Tech, Tasks, Review, PLANNING
+  - Size: 236 chars (~59 tokens)
+- **markdown_section_d0530f8f_250** (markdown_section, L250-259)
+  - Summary: 1. **DEPLOYMENT_READY.md** - Complete deployment guide...
+  - Keywords: Recipients, deployment, Distribution, minute, DEPLOYMENT_READY
+  - Size: 331 chars (~82 tokens)
+- **markdown_section_41a77433_260** (markdown_section, L260-266)
+  - Summary: 1. **.github/copilot-instructions.md** - Modify dev standards...
+  - Keywords: Define, Access, Customization, PLANNING, dev
+  - Size: 183 chars (~45 tokens)
+- **markdown_section_2f82737b_267** (markdown_section, L267-271)
+  - Summary: ```bash...
+  - Keywords: Key, bash, cat, DEPLOYMENT_READY, Deployment
+  - Size: 73 chars (~18 tokens)
+- **markdown_section_5e109101_272** (markdown_section, L272-277)
+  - Summary: cat QUICK_START.md...
+  - Keywords: start, cat, Quick, Build, guide
+  - Size: 82 chars (~20 tokens)
+- **markdown_section_c5922ded_278** (markdown_section, L278-283)
+  - Summary: cat README.md...
+  - Keywords: bash, cat, documentation, List, Full
+  - Size: 67 chars (~16 tokens)
+- **markdown_section_6aa5073b_284** (markdown_section, L284-289)
+  - Summary: tree ....
+  - Keywords: find, file, sort, type, Complete
+  - Size: 68 chars (~17 tokens)
+- **markdown_section_e371e8ce_290** (markdown_section, L290-295)
+  - Summary: find . -type f | wc -l...
+  - Keywords: files, find, Documentation, bash, type
+  - Size: 75 chars (~18 tokens)
+- **markdown_section_22ff8ffd_296** (markdown_section, L296-315)
+  - Summary: grep -r "docker" *.md...
+  - Keywords: grep, Before, these, Find, Distribution
+  - Size: 423 chars (~105 tokens)
+- **markdown_section_9ccf29d1_316** (markdown_section, L316-322)
+  - Summary: - `.github/INFRASTRUCTURE.md` - Docker deployment guide...
+  - Keywords: methods, deployment, INFRASTRUCTURE, Docker, Distribution
+  - Size: 205 chars (~51 tokens)
+- **markdown_section_6ad1a7c8_323** (markdown_section, L323-332)
+  - Summary: - `.github/INDEX.md` - Navigation patterns...
+  - Keywords: Context, Navigation, compatibility, CLAUDE, Automation
+  - Size: 335 chars (~83 tokens)
+- **markdown_section_00a9c70d_333** (markdown_section, L333-340)
+  - Summary: - Update base Docker image...
+  - Keywords: Updates, image, documentation, Maintenance, slash
+  - Size: 135 chars (~33 tokens)
+- **markdown_section_fbd610e3_341** (markdown_section, L341-345)
+  - Summary: ```bash...
+  - Keywords: releases, Control, bash, Version, tag
+  - Size: 81 chars (~20 tokens)
+- **markdown_section_26ef2b9c_346** (markdown_section, L346-351)
+  - Summary: git log --oneline...
+  - Keywords: changes, bash, log, File, git
+  - Size: 65 chars (~16 tokens)
+- **markdown_section_70cceadd_352** (markdown_section, L352-357)
+  - Summary: grep -r "password\|api_key\|secret" ....
+  - Keywords: data, grep, secret, find, file
+  - Size: 120 chars (~30 tokens)
+- **markdown_section_761214a3_358** (markdown_section, L358-361)
+  - Summary: du -sh *...
+  - Keywords: Check, file, sizes
+  - Size: 32 chars (~8 tokens)
+- **markdown_section_767e98ea_362** (markdown_section, L362-377)
+  - Summary: This project includes:...
+  - Keywords: files, docs, includes, lines, specialized
+  - Size: 509 chars (~127 tokens)
+- **markdown_section_6dc2ae5a_378** (markdown_section, L378-399)
+  - Summary: For help, check:...
+  - Keywords: check, and, Verification, documentation, Status
+  - Size: 641 chars (~160 tokens)
+
+#### `MCP_INSTALL.md`
+
+- **markdown_section_bc40e42a_1** (markdown_section, L1-6)
+  - Summary: # Universal Context Template - MCP Installation...
+  - Keywords: Start, Universal, Context, Template, Installation
+  - Size: 120 chars (~30 tokens)
+- **markdown_section_e3acc64a_7** (markdown_section, L7-13)
+  - Summary: ```bash...
+  - Keywords: Container, the, https, Template, bash
+  - Size: 182 chars (~45 tokens)
+- **markdown_section_095a373b_14** (markdown_section, L14-17)
+  - Summary: docker-compose -f docker-compose.mcp.yml up -d...
+  - Keywords: Compose, with, compose, mcp, yml
+  - Size: 79 chars (~19 tokens)
+- **markdown_section_cebc6c03_18** (markdown_section, L18-38)
+  - Summary: Add to your Claude Desktop config (`~/.config/claude-desktop/config.json` on Mac...
+  - Keywords: json, desktop, config, Windows, APPDATA
+  - Size: 585 chars (~146 tokens)
+- **markdown_section_8f465986_39** (markdown_section, L39-55)
+  - Summary: Now in Claude Desktop, you can:...
+  - Keywords: FedRAMP, the, you, project, Now
+  - Size: 307 chars (~76 tokens)
+- **markdown_section_f792b1c0_56** (markdown_section, L56-64)
+  - Summary: npm install -g mcp-server-docker...
+  - Keywords: myapp, with, ALLOWED_CONTAINERS, Run, globally
+  - Size: 148 chars (~37 tokens)
+- **markdown_section_31e97a9a_65** (markdown_section, L65-73)
+  - Summary: Once connected, you can ask Claude to run these commands in the template contain...
+  - Keywords: the, these, container, can, Available
+  - Size: 195 chars (~48 tokens)
+- **markdown_section_ecf2b321_74** (markdown_section, L74-83)
+  - Summary: ```bash...
+  - Keywords: Agents, bash, project, List, FEDRAMP_SECURITY_AGENT
+  - Size: 176 chars (~44 tokens)
+- **markdown_section_ff4a58d0_84** (markdown_section, L84-100)
+  - Summary: ```bash...
+  - Keywords: python, Specialized, Cloud, Included, rag
+  - Size: 453 chars (~113 tokens)
+- **markdown_section_02915568_101** (markdown_section, L101-109)
+  - Summary: ## Docker Hub Distribution...
+  - Keywords: bash, uct, push, latest, Distribution
+  - Size: 143 chars (~35 tokens)
+- **markdown_section_747d438c_110** (markdown_section, L110-120)
+  - Summary: ```bash...
+  - Keywords: Troubleshooting, bash, uct, latest, project
+  - Size: 148 chars (~37 tokens)
+- **markdown_section_eb771be0_121** (markdown_section, L121-128)
+  - Summary: - Ensure Docker is running...
+  - Keywords: Container, socket, connect, sock, Check
+  - Size: 260 chars (~65 tokens)
+- **markdown_section_91d72eb9_129** (markdown_section, L129-140)
+  - Summary: - Restart Claude Desktop after config changes...
+  - Keywords: Restart, logs, docker, config, Check
+  - Size: 311 chars (~77 tokens)
+
+#### `MODEL_AGNOSTIC_DESIGN.md`
+
+- **markdown_section_2ea36dca_1** (markdown_section, L1-8)
+  - Summary: # 🤖 Model-Agnostic Design...
+  - Keywords: seamlessly, Design, Supported, with, ANY
+  - Size: 176 chars (~44 tokens)
+- **markdown_section_9320a74d_9** (markdown_section, L9-23)
+  - Summary: - **Claude** (Anthropic) - Claude Code, Claude.ai, API...
+  - Keywords: GPT, Pro, Supported, Meta, Fully
+  - Size: 501 chars (~125 tokens)
+- **markdown_section_00449754_24** (markdown_section, L24-28)
+  - Summary: All context files are plain Markdown - readable by any AI model:...
+  - Keywords: files, Markdown, Standard, readable, Agnostic
+  - Size: 137 chars (~34 tokens)
+- **markdown_section_7daa5021_29** (markdown_section, L29-36)
+  - Summary: Development standards written in clear Markdown...
+  - Keywords: All, Markdown, features, have, clear
+  - Size: 125 chars (~31 tokens)
+- **markdown_section_2c68c43b_37** (markdown_section, L37-56)
+  - Summary: We avoid:...
+  - Keywords: Specific, Proprietary, delimiters, markup, Clean
+  - Size: 520 chars (~130 tokens)
+- **markdown_section_1369cc7b_57** (markdown_section, L57-72)
+  - Summary: ```...
+  - Keywords: Readable, Flexible, Context, Markdown, PLANNING
+  - Size: 346 chars (~86 tokens)
+- **markdown_section_81426009_73** (markdown_section, L73-78)
+  - Summary: ```bash...
+  - Keywords: Initialize, bash, project, init, Claude
+  - Size: 75 chars (~18 tokens)
+- **markdown_section_de1ec97a_79** (markdown_section, L79-82)
+  - Summary: ```...
+  - Keywords: the, directory, work, automatically, out
+  - Size: 89 chars (~22 tokens)
+- **markdown_section_99576f77_83** (markdown_section, L83-90)
+  - Summary: ```bash...
+  - Keywords: GPT, paste, Upload, files, bash
+  - Size: 146 chars (~36 tokens)
+- **markdown_section_b8920166_91** (markdown_section, L91-105)
+  - Summary: curl https://api.openai.com/v1/chat/completions \...
+  - Keywords: com, cat, API, use, Type
+  - Size: 332 chars (~83 tokens)
+- **markdown_section_4ac59174_106** (markdown_section, L106-107)
+  - Summary: # Copilot reads workspace files automatically...
+  - Keywords: workspace, files, Just, have, project
+  - Size: 88 chars (~22 tokens)
+- **markdown_section_1ea85f8e_108** (markdown_section, L108-113)
+  - Summary: ```...
+  - Keywords: file, bash, Models, Studio, context
+  - Size: 87 chars (~21 tokens)
+- **markdown_section_e18aa7d5_114** (markdown_section, L114-119)
+  - Summary: ollama run codellama "$(cat .github/copilot-instructions.md .github/INITIAL.md PLANNING.md)...
+  - Keywords: into, cat, PLANNING, dev, use
+  - Size: 176 chars (~44 tokens)
+- **markdown_section_d251b9b3_120** (markdown_section, L120-127)
+  - Summary: ```...
+  - Keywords: workspace, read, python, genai, automatically
+  - Size: 113 chars (~28 tokens)
+- **markdown_section_8e9640bd_128** (markdown_section, L128-138)
+  - Summary: with open('.github/copilot-instructions.md') as f:...
+  - Keywords: read, files, with, generate_content, prompt
+  - Size: 251 chars (~62 tokens)
+- **markdown_section_e5766f9f_139** (markdown_section, L139-154)
+  - Summary: ```python...
+  - Keywords: read, context_files, pattern, Custom, join
+  - Size: 249 chars (~62 tokens)
+- **markdown_section_898e5547_155** (markdown_section, L155-166)
+  - Summary: response = requests.post(...
+  - Keywords: the, com, Send, API, requests
+  - Size: 222 chars (~55 tokens)
+- **markdown_section_a49a2ae5_167** (markdown_section, L167-198)
+  - Summary: ```...
+  - Keywords: Delivery, Separation, decisions, standards, Development
+  - Size: 805 chars (~201 tokens)
+- **markdown_section_1659527c_199** (markdown_section, L199-217)
+  - Summary: ```xml...
+  - Keywords: Specific, Universal, Over, Implicit, Good
+  - Size: 313 chars (~78 tokens)
+- **markdown_section_b52dc517_218** (markdown_section, L218-222)
+  - Summary: ## File Format Standards...
+  - Keywords: Markdown, Standards, File, Headers, markdown
+  - Size: 60 chars (~15 tokens)
+- **markdown_section_2118e768_223** (markdown_section, L223-224)
+  - Summary: # Level 1 - Major Sections...
+  - Keywords: Major, Sections, Level, Sub
+  - Size: 53 chars (~13 tokens)
+- **markdown_section_955bef74_225** (markdown_section, L225-241)
+  - Summary: ```...
+  - Keywords: headers, Details, python, any, can
+  - Size: 237 chars (~59 tokens)
+- **markdown_section_72bf84fa_242** (markdown_section, L242-260)
+  - Summary: ```markdown...
+  - Keywords: and, Standard, Links, Lists, works
+  - Size: 276 chars (~69 tokens)
+- **markdown_section_fbc9a1ac_261** (markdown_section, L261-272)
+  - Summary: ## Testing Model Compatibility...
+  - Keywords: hard, All, Testing, Compatibility, tool
+  - Size: 295 chars (~73 tokens)
+- **markdown_section_af635e34_273** (markdown_section, L273-280)
+  - Summary: ```bash...
+  - Keywords: grep, Validation, bash, Check, CLAUDE
+  - Size: 149 chars (~37 tokens)
+- **markdown_section_d6b23544_281** (markdown_section, L281-285)
+  - Summary: ```...
+  - Keywords: Migration, Guide, nothing, Should
+  - Size: 50 chars (~12 tokens)
+- **markdown_section_3ea8ab69_286** (markdown_section, L286-309)
+  - Summary: ```markdown...
+  - Keywords: Specific, Universal, Before, these, name
+  - Size: 376 chars (~94 tokens)
+- **markdown_section_254c14d9_310** (markdown_section, L310-316)
+  - Summary: Research the latest best practices for this feature....
+  - Keywords: Proofing, the, best, latest, Future
+  - Size: 106 chars (~26 tokens)
+- **markdown_section_9d58dac7_317** (markdown_section, L317-333)
+  - Summary: ✅ **Future AI models will read Markdown**...
+  - Keywords: read, and, Markdown, Guarantees, Backward
+  - Size: 429 chars (~107 tokens)
+- **markdown_section_338ccb13_334** (markdown_section, L334-350)
+  - Summary: ❌ **Slash commands** - Model-specific feature...
+  - Keywords: Universal, Break, Alternative, Read, feature
+  - Size: 547 chars (~136 tokens)
+- **markdown_section_32ae8775_351** (markdown_section, L351-355)
+  - Summary: ## Best Practices...
+  - Keywords: Practices, Best, Write, First, markdown
+  - Size: 62 chars (~15 tokens)
+- **markdown_section_12ec8227_356** (markdown_section, L356-364)
+  - Summary: Test all features before committing. This ensures quality....
+  - Keywords: run_tests, before, features, understand, Good
+  - Size: 182 chars (~45 tokens)
+- **markdown_section_f6e35eee_365** (markdown_section, L365-371)
+  - Summary: ```markdown...
+  - Keywords: Good, execute, Run, all, Coverage
+  - Size: 112 chars (~28 tokens)
+- **markdown_section_086e06a7_372** (markdown_section, L372-380)
+  - Summary: Test thoroughly....
+  - Keywords: Clear, Standard, Formats, work, across
+  - Size: 122 chars (~30 tokens)
+- **markdown_section_b516983e_381** (markdown_section, L381-392)
+  - Summary: - Task 1: Implement auth...
+  - Keywords: Implement, Deploy, pending, Good, Example
+  - Size: 187 chars (~46 tokens)
+- **markdown_section_3c5b9ed3_393** (markdown_section, L393-414)
+  - Summary: This template is **truly model-agnostic** because:...
+  - Keywords: standard, Markdown, truly, Uses, today
+  - Size: 525 chars (~131 tokens)
+
+#### `PLANNING.md`
+
+- **markdown_section_3abe3177_1** (markdown_section, L1-3)
+  - Summary: # PLANNING.md...
+  - Keywords: PLANNING, Project, Name, Planning, Architecture
+  - Size: 66 chars (~16 tokens)
+- **markdown_section_8a4c9e9b_4** (markdown_section, L4-12)
+  - Summary: - **Framework**: [e.g., React 18 + TypeScript 5.0+]...
+  - Keywords: etc, Webpack, Management, Stack, Build
+  - Size: 316 chars (~79 tokens)
+- **markdown_section_77780196_13** (markdown_section, L13-27)
+  - Summary: - **Framework**: [e.g., FastAPI, Express, Django, etc.]...
+  - Keywords: important, backend, Python, List, libraries
+  - Size: 637 chars (~159 tokens)
+- **markdown_section_be76c940_28** (markdown_section, L28-35)
+  - Summary: 1. Read `.github/copilot-instructions.md` for development standards...
+  - Keywords: Workflow, Reference, sprint, current, work
+  - Size: 288 chars (~72 tokens)
+- **markdown_section_c8b96359_36** (markdown_section, L36-40)
+  - Summary: ```bash...
+  - Keywords: start, bash, dev, command, Feature
+  - Size: 114 chars (~28 tokens)
+- **markdown_section_11cfce72_41** (markdown_section, L41-48)
+  - Summary: git checkout -b feature/your-feature-name...
+  - Keywords: checkout, mode, Create, name, cycle
+  - Size: 183 chars (~45 tokens)
+- **markdown_section_2bc961c7_49** (markdown_section, L49-59)
+  - Summary: [command to run tests]...
+  - Keywords: framework, and, Integration, Before, testing
+  - Size: 324 chars (~81 tokens)
+- **markdown_section_5cd4d5f3_60** (markdown_section, L60-68)
+  - Summary: - **Components**: [e.g., PascalCase, kebab-case]...
+  - Keywords: Constants, case, spec, Types, kebab
+  - Size: 264 chars (~66 tokens)
+- **markdown_section_82fb9724_69** (markdown_section, L69-82)
+  - Summary: ```...
+  - Keywords: directories, files, Key, utilities, Decisions
+  - Size: 237 chars (~59 tokens)
+- **markdown_section_d6e28335_83** (markdown_section, L83-92)
+  - Summary: - **Decision**: [What was decided]...
+  - Keywords: Rationale, way, Decision, Why, What
+  - Size: 322 chars (~80 tokens)
+- **markdown_section_71a82324_93** (markdown_section, L93-102)
+  - Summary: - **Decision**: [What was decided]...
+  - Keywords: State, Rationale, way, Decision, state
+  - Size: 315 chars (~78 tokens)
+- **markdown_section_6564fd6f_103** (markdown_section, L103-109)
+  - Summary: - **Frontend**: [Frontend error handling strategy]...
+  - Keywords: Performance, Error, Logging, strategy, handling
+  - Size: 186 chars (~46 tokens)
+- **markdown_section_89709ce8_110** (markdown_section, L110-120)
+  - Summary: - **Metric 1**: [Target value]...
+  - Keywords: Performance, Standards, size, Response, System
+  - Size: 299 chars (~74 tokens)
+- **markdown_section_92fad9d2_121** (markdown_section, L121-128)
+  - Summary: - **Data Storage**: [How data is stored and protected]...
+  - Keywords: data, and, Compliance, Encryption, Storage
+  - Size: 237 chars (~59 tokens)
+- **markdown_section_60c13b11_129** (markdown_section, L129-136)
+  - Summary: - **Authentication**: [Authentication requirements]...
+  - Keywords: Access, Control, API, measures, Infrastructure
+  - Size: 248 chars (~62 tokens)
+- **markdown_section_306c9386_137** (markdown_section, L137-156)
+  - Summary: - **Development**: [Development environment setup]...
+  - Keywords: process, setup, release, Environments, Production
+  - Size: 567 chars (~141 tokens)
+
+#### `QUICK_START.md`
+
+- **markdown_section_10e24edc_1** (markdown_section, L1-6)
+  - Summary: # Quick Start Guide...
+  - Keywords: and, Methods, minutes, Quick, Get
+  - Size: 90 chars (~22 tokens)
+- **markdown_section_3ed52e76_7** (markdown_section, L7-12)
+  - Summary: ```bash...
+  - Keywords: Installer, and, bash, Python, python
+  - Size: 117 chars (~29 tokens)
+- **markdown_section_7ba93f3e_13** (markdown_section, L13-23)
+  - Summary: python install.py ....
+  - Keywords: module, the, you, image, Python
+  - Size: 198 chars (~49 tokens)
+- **markdown_section_f3a52f46_24** (markdown_section, L24-33)
+  - Summary: ./extract-from-docker.sh ./my-project...
+  - Keywords: you, file, bash, project, received
+  - Size: 161 chars (~40 tokens)
+- **markdown_section_89393c8f_34** (markdown_section, L34-40)
+  - Summary: docker load < universal-context-template.tar.gz...
+  - Keywords: the, image, Then, extract, project
+  - Size: 130 chars (~32 tokens)
+- **markdown_section_f1626abb_41** (markdown_section, L41-46)
+  - Summary: ```bash...
+  - Keywords: scripts, Python, bash, project, init
+  - Size: 104 chars (~26 tokens)
+- **markdown_section_1833df80_47** (markdown_section, L47-61)
+  - Summary: .\scripts\init-project.ps1 -ProjectName my-project -OutputDir ....
+  - Keywords: OutputDir, Manual, directories, files, ProjectName
+  - Size: 295 chars (~73 tokens)
+- **markdown_section_9156016c_62** (markdown_section, L62-89)
+  - Summary: ```...
+  - Keywords: specialized, INFRASTRUCTURE_HARDENING_AGENT, RAG, project, Get
+  - Size: 833 chars (~208 tokens)
+- **markdown_section_2344f198_90** (markdown_section, L90-98)
+  - Summary: ## First Steps After Installation...
+  - Keywords: IDE, Steps, bash, with, extension
+  - Size: 142 chars (~35 tokens)
+- **markdown_section_b3a03109_99** (markdown_section, L99-115)
+  - Summary: In Claude Code, run:...
+  - Keywords: files, Initialize, Context, Edit, init
+  - Size: 311 chars (~77 tokens)
+- **markdown_section_330dfd2b_116** (markdown_section, L116-132)
+  - Summary: Activate specialized experts with slash commands:...
+  - Keywords: Kafka, producers, Agent, specialized, with
+  - Size: 688 chars (~172 tokens)
+- **markdown_section_d0c2ecac_133** (markdown_section, L133-148)
+  - Summary: For intelligent code search and memory:...
+  - Keywords: and, search, code, python, pip
+  - Size: 222 chars (~55 tokens)
+- **markdown_section_f7d0caad_149** (markdown_section, L149-162)
+  - Summary: This template is **FedRAMP Moderate compliant** with:...
+  - Keywords: FedRAMP, compliant, Moderate, with, controls
+  - Size: 254 chars (~63 tokens)
+- **markdown_section_74abaf44_163** (markdown_section, L163-170)
+  - Summary: ```bash...
+  - Keywords: module, docs, https, Python, bash
+  - Size: 159 chars (~39 tokens)
+- **markdown_section_b46dc642_171** (markdown_section, L171-177)
+  - Summary: ```bash...
+  - Keywords: Permission, chmod, image, bash, Can
+  - Size: 114 chars (~28 tokens)
+- **markdown_section_1b26b3ad_178** (markdown_section, L178-188)
+  - Summary: gunzip -c universal-context-template.tar.gz | docker load...
+  - Keywords: and, share, bash, Distribution, Decompress
+  - Size: 140 chars (~35 tokens)
+- **markdown_section_afa200ff_189** (markdown_section, L189-194)
+  - Summary: docker build -t universal-context-template:latest ....
+  - Keywords: gzip, image, Create, uct, save
+  - Size: 166 chars (~41 tokens)
+- **markdown_section_71bde0c3_195** (markdown_section, L195-212)
+  - Summary: zip -r universal-context-template.zip . -x ".git/*" -x "output/*"...
+  - Keywords: the, documentation, zip, INFRASTRUCTURE, output
+  - Size: 390 chars (~97 tokens)
+
+#### `README.md`
+
+- **markdown_section_a7be2e11_1** (markdown_section, L1-6)
+  - Summary: # 🚀 UNIVERSAL CONTEXT ENGINEERING TEMPLATE...
+  - Keywords: ENGINEERING, and, CONTEXT, package, just
+  - Size: 151 chars (~37 tokens)
+- **markdown_section_58ce7d61_7** (markdown_section, L7-19)
+  - Summary: - `.github/copilot-instructions.md` - Universal development standards with communication style...
+  - Keywords: Universal, Context, with, communication, Navigation
+  - Size: 491 chars (~122 tokens)
+- **markdown_section_2491a5d1_20** (markdown_section, L20-28)
+  - Summary: 1. **Copy this entire folder** to your new project...
+  - Keywords: files, folder, new, Quick, project
+  - Size: 322 chars (~80 tokens)
+- **markdown_section_7cb85eb3_29** (markdown_section, L29-33)
+  - Summary: ```bash...
+  - Keywords: the, image, bash, Build, Distribution
+  - Size: 100 chars (~25 tokens)
+- **markdown_section_18b00aa7_34** (markdown_section, L34-39)
+  - Summary: docker-compose run context-template bash /template/scripts/init-project.sh my-pr...
+  - Keywords: powershell, Initialize, bash, project, init
+  - Size: 208 chars (~52 tokens)
+- **markdown_section_ff8fe99a_40** (markdown_section, L40-51)
+  - Summary: ```...
+  - Keywords: flexible, framework, with, project, will
+  - Size: 467 chars (~116 tokens)
+- **markdown_section_1a09afb0_52** (markdown_section, L52-65)
+  - Summary: - ✅ Claude (Code, API, claude.ai)...
+  - Keywords: Universal, with, ANY, API, ChatGPT
+  - Size: 365 chars (~91 tokens)
+- **markdown_section_1e0fa405_66** (markdown_section, L66-87)
+  - Summary: 1. **Pull or receive the Docker image:**...
+  - Keywords: the, Receiving, image, Template, bash
+  - Size: 574 chars (~143 tokens)
+- **markdown_section_fd95409f_88** (markdown_section, L88-93)
+  - Summary: ```bash...
+  - Keywords: Maintainers, and, image, bash, Template
+  - Size: 113 chars (~28 tokens)
+- **markdown_section_8b01683c_94** (markdown_section, L94-99)
+  - Summary: docker save universal-context-template:latest > universal-context-template.tar...
+  - Keywords: the, image, file, with, save
+  - Size: 149 chars (~37 tokens)
+- **markdown_section_df0ee703_100** (markdown_section, L100-105)
+  - Summary: ```bash...
+  - Keywords: bash, run, Mode, container, context
+  - Size: 104 chars (~26 tokens)
+- **markdown_section_b3bc8fdc_106** (markdown_section, L106-112)
+  - Summary: cd /template/scripts...
+  - Keywords: Deploy, Build, project, init, run
+  - Size: 101 chars (~25 tokens)
+- **markdown_section_323dedc4_113** (markdown_section, L113-119)
+  - Summary: ```bash...
+  - Keywords: and, bash, Build, Quick, Comprehensive
+  - Size: 95 chars (~23 tokens)
+- **markdown_section_5e05b4be_120** (markdown_section, L120-129)
+  - Summary: make build...
+  - Keywords: powershell, and, Make, Comprehensive, Windows
+  - Size: 116 chars (~29 tokens)
+- **markdown_section_e9ea9551_130** (markdown_section, L130-143)
+  - Summary: docker build -t universal-context-template:latest ....
+  - Keywords: the, Before, Verification, succeeds, Build
+  - Size: 334 chars (~83 tokens)
+- **markdown_section_5a799af8_144** (markdown_section, L144-157)
+  - Summary: See `.github/INFRASTRUCTURE.md` for detailed Docker deployment guide....
+  - Keywords: verification, deployment, INFRASTRUCTURE, minute, detailed
+  - Size: 378 chars (~94 tokens)
+- **markdown_section_9457f861_158** (markdown_section, L158-163)
+  - Summary: ```bash...
+  - Keywords: gzip, Image, bash, save, latest
+  - Size: 177 chars (~44 tokens)
+- **markdown_section_4084e3a4_164** (markdown_section, L164-169)
+  - Summary: ```bash...
+  - Keywords: fork, bash, repo, Clone, Repository
+  - Size: 100 chars (~25 tokens)
+- **markdown_section_36f1b77c_170** (markdown_section, L170-173)
+  - Summary: - Zip the entire directory...
+  - Keywords: Extract, the, and, with, project
+  - Size: 133 chars (~33 tokens)
+
+#### `RECIPIENT_QUICKSTART.md`
+
+- **markdown_section_28d1b503_1** (markdown_section, L1-16)
+  - Summary: # 🚀 Universal Context Template - Quick Start for Recipients...
+  - Keywords: Universal, Context, Recipients, specialized, Template
+  - Size: 535 chars (~133 tokens)
+- **markdown_section_dabf17f1_17** (markdown_section, L17-21)
+  - Summary: ## ⚡ Quick Setup (2 minutes)...
+  - Keywords: the, Image, bash, Quick, Docker
+  - Size: 68 chars (~17 tokens)
+- **markdown_section_0a16b1e1_22** (markdown_section, L22-34)
+  - Summary: docker load < universal-context-template.tar.gz...
+  - Keywords: the, image, setup, loaded, Expected
+  - Size: 267 chars (~66 tokens)
+- **markdown_section_6326f880_35** (markdown_section, L35-40)
+  - Summary: ```bash...
+  - Keywords: the, bash, latest, works, Everything
+  - Size: 137 chars (~34 tokens)
+- **markdown_section_3d26e630_41** (markdown_section, L41-56)
+  - Summary: docker run --rm universal-context-template:latest sh -c "ls /template/.github/ag...
+  - Keywords: AGENT, included, latest, Check, should
+  - Size: 341 chars (~85 tokens)
+- **markdown_section_a04189bb_57** (markdown_section, L57-65)
+  - Summary: docker run -it --rm universal-context-template:latest sh...
+  - Keywords: the, cat, Run, latest, explore
+  - Size: 207 chars (~51 tokens)
+- **markdown_section_4a1ab488_66** (markdown_section, L66-72)
+  - Summary: ```...
+  - Keywords: files, the, and, copy, Simply
+  - Size: 151 chars (~37 tokens)
+- **markdown_section_e95678da_73** (markdown_section, L73-84)
+  - Summary: mkdir -p my-project...
+  - Keywords: Initialize, Create, project, latest, init
+  - Size: 230 chars (~57 tokens)
+- **markdown_section_1dd0504f_85** (markdown_section, L85-86)
+  - Summary: ## 🤖 Using the Specialized Agents...
+  - Keywords: Specialized, the, Using, Agents
+  - Size: 34 chars (~8 tokens)
+- **markdown_section_03c7c9e2_87** (markdown_section, L87-98)
+  - Summary: Think of them as **5 domain experts** you can activate:...
+  - Keywords: the, producers, domain, them, Expertise
+  - Size: 610 chars (~152 tokens)
+- **markdown_section_808157e2_99** (markdown_section, L99-128)
+  - Summary: 1. **Copy agent files to your project:**...
+  - Keywords: files, the, bash, agent, project
+  - Size: 704 chars (~176 tokens)
+- **markdown_section_e5a4b2e5_129** (markdown_section, L129-144)
+  - Summary: ## 📚 What Each Agent Can Help With...
+  - Keywords: Kafka, and, Helps, lines, with
+  - Size: 458 chars (~114 tokens)
+- **markdown_section_c04a677f_145** (markdown_section, L145-172)
+  - Summary: - Cloud architecture design...
+  - Keywords: CDK, lines, with, ECS, deployment
+  - Size: 875 chars (~218 tokens)
+- **markdown_section_ff756d21_173** (markdown_section, L173-200)
+  - Summary: - Microservices architecture patterns...
+  - Keywords: Discovery, Eureka, Circuit, Helps, lines
+  - Size: 783 chars (~195 tokens)
+- **markdown_section_adbb5b21_201** (markdown_section, L201-205)
+  - Summary: ## 🎯 Real-World Usage Examples...
+  - Keywords: Real, bash, Example, Microservice, Examples
+  - Size: 80 chars (~20 tokens)
+- **markdown_section_daac380f_206** (markdown_section, L206-217)
+  - Summary: /agent-springboot...
+  - Keywords: order, Create, with, Build, agent
+  - Size: 292 chars (~73 tokens)
+- **markdown_section_556c540b_218** (markdown_section, L218-226)
+  - Summary: /agent-docker...
+  - Keywords: production, Create, ready, with, Deploy
+  - Size: 193 chars (~48 tokens)
+- **markdown_section_c1707fc6_227** (markdown_section, L227-239)
+  - Summary: ```bash...
+  - Keywords: Troubleshooting, has, lag, LazyInitializationException, bash
+  - Size: 335 chars (~83 tokens)
+- **markdown_section_f60536d5_240** (markdown_section, L240-256)
+  - Summary: The system includes **intelligent code chunking** specifically designed for Java...
+  - Keywords: and, includes, with, RAG, System
+  - Size: 668 chars (~167 tokens)
+- **markdown_section_e2ea4263_257** (markdown_section, L257-274)
+  - Summary: The system also includes standard context engineering files:...
+  - Keywords: and, The, engineering, standards, Development
+  - Size: 694 chars (~173 tokens)
+- **markdown_section_bb401141_275** (markdown_section, L275-288)
+  - Summary: - Agent documentation: `/template/.github/agents/`...
+  - Keywords: the, RAG, rag, documentation, agent
+  - Size: 399 chars (~99 tokens)
+- **markdown_section_72c2a5f3_289** (markdown_section, L289-300)
+  - Summary: mkdir -p .github...
+  - Keywords: the, files, image, Steps, done
+  - Size: 282 chars (~70 tokens)
+- **markdown_section_ec73345f_301** (markdown_section, L301-304)
+  - Summary: ```bash...
+  - Keywords: Troubleshooting, image, bash, Can, load
+  - Size: 51 chars (~12 tokens)
+- **markdown_section_91ea30f3_305** (markdown_section, L305-311)
+  - Summary: docker ps...
+  - Keywords: sure, Make, loading, tar, again
+  - Size: 114 chars (~28 tokens)
+- **markdown_section_b1aca714_312** (markdown_section, L312-316)
+  - Summary: ```bash...
+  - Keywords: bash, Run, what, latest, see
+  - Size: 117 chars (~29 tokens)
+- **markdown_section_a12b63a8_317** (markdown_section, L317-324)
+  - Summary: cd /template...
+  - Keywords: Extract, files, Then, bash, cat
+  - Size: 104 chars (~26 tokens)
+- **markdown_section_2e021d95_325** (markdown_section, L325-335)
+  - Summary: docker run --rm universal-context-template:latest \...
+  - Keywords: Extract, RAG, cat, latest, KAFKA_AGENT
+  - Size: 309 chars (~77 tokens)
+- **markdown_section_42f5111e_336** (markdown_section, L336-354)
+  - Summary: - ✅ 5 specialized AI domain experts...
+  - Keywords: production, lines, code, domain, Complete
+  - Size: 470 chars (~117 tokens)
+
+#### `SECURITY_COMPLIANCE.md`
+
+- **markdown_section_f4978bea_1** (markdown_section, L1-16)
+  - Summary: This document provides comprehensive security validation for FedRAMP, NIST 800-5...
+  - Keywords: FedRAMP, Universal, Context, document, Validation
+  - Size: 559 chars (~139 tokens)
+- **markdown_section_802df180_17** (markdown_section, L17-20)
+  - Summary: ## Pre-Deployment Security Checklist...
+  - Keywords: Container, Checklist, Deployment, CIS, Pre
+  - Size: 85 chars (~21 tokens)
+- **markdown_section_59b56bef_21** (markdown_section, L21-33)
+  - Summary: - [x] **CIS 1.1.1** - Ensure a separate partition for containers exists...
+  - Keywords: exists, Host, trusted, control, users
+  - Size: 582 chars (~145 tokens)
+- **markdown_section_3f08b777_34** (markdown_section, L34-51)
+  - Summary: - [x] **CIS 4.1** - Non-root user in Dockerfile...
+  - Keywords: Container, unnecessary, Images, secrets, enabled
+  - Size: 735 chars (~183 tokens)
+- **markdown_section_2c4340e1_52** (markdown_section, L52-59)
+  - Summary: - [x] **AC-2** - Account Management (non-root user, UID > 10000)...
+  - Keywords: Control, root, Management, minimal, UID
+  - Size: 337 chars (~84 tokens)
+- **markdown_section_aa75866b_60** (markdown_section, L60-73)
+  - Summary: - [x] **AU-2** - Audit Events (logging configured)...
+  - Keywords: Audit, and, configured, Review, pipeline
+  - Size: 672 chars (~168 tokens)
+- **markdown_section_1678d449_74** (markdown_section, L74-84)
+  - Summary: - [x] **IA-2** - Identification and Authentication (service accounts)...
+  - Keywords: secrets, and, System, network, guidance
+  - Size: 543 chars (~135 tokens)
+- **markdown_section_d489c134_85** (markdown_section, L85-98)
+  - Summary: - [x] **SI-2** - Flaw Remediation (security scanning)...
+  - Keywords: Monitoring, and, Malware, pipeline, System
+  - Size: 600 chars (~150 tokens)
+- **markdown_section_50053e59_99** (markdown_section, L99-111)
+  - Summary: ## Security Scanning Results...
+  - Keywords: Security, Type, Scan, HIGH, Frequency
+  - Size: 503 chars (~125 tokens)
+- **markdown_section_ed91984f_112** (markdown_section, L112-117)
+  - Summary: ```bash...
+  - Keywords: Container, CRITICAL, image, bash, Run
+  - Size: 149 chars (~37 tokens)
+- **markdown_section_c4181fed_118** (markdown_section, L118-123)
+  - Summary: dockle universal-context-template:latest...
+  - Keywords: Run, latest, Hadolint, Dockerfile, hadolint
+  - Size: 121 chars (~30 tokens)
+- **markdown_section_aa17dfd1_124** (markdown_section, L124-130)
+  - Summary: syft universal-context-template:latest -o spdx-json > sbom.json...
+  - Keywords: json, sbom, latest, SBOM, grype
+  - Size: 139 chars (~34 tokens)
+- **markdown_section_caa1843e_131** (markdown_section, L131-147)
+  - Summary: ## Runtime Security Configuration...
+  - Keywords: privileges, Security, docker, security, opt
+  - Size: 346 chars (~86 tokens)
+- **markdown_section_09d819ea_148** (markdown_section, L148-166)
+  - Summary: ```yaml...
+  - Keywords: securityContext, yaml, Context, runAsUser, readOnlyRootFilesystem
+  - Size: 318 chars (~79 tokens)
+- **markdown_section_75992fd9_167** (markdown_section, L167-190)
+  - Summary: 1. **Run security scans**...
+  - Keywords: the, Validation, bash, GitHub, Run
+  - Size: 548 chars (~137 tokens)
+- **markdown_section_f77ab952_191** (markdown_section, L191-211)
+  - Summary: 1. **Verify runtime security**...
+  - Keywords: Validation, bash, format, inspect, Config
+  - Size: 498 chars (~124 tokens)
+- **markdown_section_1dd03577_212** (markdown_section, L212-223)
+  - Summary: - Complete NIST 800-53 control implementations...
+  - Keywords: cryptography, guidance, Infrastructure, Security, Complete
+  - Size: 352 chars (~88 tokens)
+- **markdown_section_b2cae833_224** (markdown_section, L224-231)
+  - Summary: - Identity-aware proxy configurations...
+  - Keywords: examples, policy, security, policies, Rego
+  - Size: 168 chars (~42 tokens)
+- **markdown_section_daa7b65a_232** (markdown_section, L232-247)
+  - Summary: If you discover a security vulnerability:...
+  - Keywords: the, NOT, you, Include, Reporting
+  - Size: 447 chars (~111 tokens)
+- **markdown_section_6ebe6e8b_248** (markdown_section, L248-257)
+  - Summary: ## Continuous Compliance...
+  - Keywords: Automated, gates, GitHub, security, Compliance
+  - Size: 266 chars (~66 tokens)
+- **markdown_section_fc7f2502_258** (markdown_section, L258-264)
+  - Summary: - [ ] Quarterly security architecture review...
+  - Keywords: Manual, FedRAMP, Access, testing, Compliance
+  - Size: 206 chars (~51 tokens)
+- **markdown_section_266f8e93_265** (markdown_section, L265-280)
+  - Summary: - [NIST SP 800-53 Rev 5](https://csrc.nist.gov/publications/detail/sp/800-53/rev...
+  - Keywords: gov, FedRAMP, https, www, Rev
+  - Size: 521 chars (~130 tokens)
+
+#### `TASK.md`
+
+- **markdown_section_382cfd53_1** (markdown_section, L1-5)
+  - Summary: # TASK.md...
+  - Keywords: Tracking, Current, Updated, TASK, Date
+  - Size: 78 chars (~19 tokens)
+- **markdown_section_7551930c_6** (markdown_section, L6-14)
+  - Summary: - [ ] **[Task Name]**...
+  - Keywords: Subtask, Priority, Current, detail, High
+  - Size: 201 chars (~50 tokens)
+- **markdown_section_0761e16a_15** (markdown_section, L15-35)
+  - Summary: - [ ] **[Task Name]**...
+  - Keywords: Priority, Key, High, Tasks, Description
+  - Size: 454 chars (~113 tokens)
+- **markdown_section_d23c00e1_36** (markdown_section, L36-45)
+  - Summary: - [ ] [Task description]...
+  - Keywords: Category, description, Task
+  - Size: 188 chars (~47 tokens)
+- **markdown_section_9c1c300f_46** (markdown_section, L46-52)
+  - Summary: - [ ] [Task description]...
+  - Keywords: Tasks, description, Completed, Category, Task
+  - Size: 116 chars (~29 tokens)
+- **markdown_section_52a74249_53** (markdown_section, L53-64)
+  - Summary: - [x] **[Task Name]** ([Completion Date])...
+  - Keywords: Priority, Key, Current, High, Previous
+  - Size: 293 chars (~73 tokens)
+- **markdown_section_be9795a3_65** (markdown_section, L65-71)
+  - Summary: - **[Issue Description]**...
+  - Keywords: High, Priority, and, details, Description
+  - Size: 113 chars (~28 tokens)
+- **markdown_section_49f2b255_72** (markdown_section, L72-81)
+  - Summary: - **[Issue Description]**...
+  - Keywords: Priority, and, details, Description, Proposed
+  - Size: 189 chars (~47 tokens)
+- **markdown_section_fc0bbfb0_82** (markdown_section, L82-88)
+  - Summary: - [Technical debt item]...
+  - Keywords: debt, Work, Technical, During, Discovered
+  - Size: 121 chars (~30 tokens)
+- **markdown_section_ac0d5331_89** (markdown_section, L89-98)
+  - Summary: - [Improvement idea]...
+  - Keywords: Quality, idea, improvement, Improvement, Improvements
+  - Size: 189 chars (~47 tokens)
+- **markdown_section_1e40d2b1_99** (markdown_section, L99-105)
+  - Summary: - **Completed:** X/Y tasks (Z%)...
+  - Keywords: Current, Pending, Progress, Completed, Metrics
+  - Size: 146 chars (~36 tokens)
+- **markdown_section_a088f682_106** (markdown_section, L106-118)
+  - Summary: - **Last Sprint:** X tasks completed...
+  - Keywords: Tracking, completed, Burn, sprint, per
+  - Size: 401 chars (~100 tokens)
+
+### Source Code
+
+*113 chunks*
+
+#### `.github\mcp-servers\unified-dev\models\__init__.py`
+
+- **python_class_5e1a5dc9_21** (python_class, L21-124)
+  - Summary: Manages multiple model instances and handles fallback logic...
+  - Keywords: and, ModelManager, Initialize, manager, with
+  - Size: 3137 chars (~784 tokens)
+
+#### `.github\mcp-servers\unified-dev\models\base.py`
+
+- **python_class_c828b766_12** (python_class, L12-19)
+  - Summary: Configuration for a model...
+  - Keywords: float, description, str, ModelConfig, model
+  - Size: 153 chars (~38 tokens)
+- **python_class_570b8e6b_20** (python_class, L20-109)
+  - Summary: Abstract base class for all model integrations
+
+    All model implementations (C...
+  - Keywords: methods, Custom, these, implementations, implement
+  - Size: 2146 chars (~536 tokens)
+
+#### `.github\mcp-servers\unified-dev\models\claude.py`
+
+- **python_class_2f73cc2c_11** (python_class, L11-107)
+  - Summary: Anthropic Claude integration
+
+    Uses Anthropic SDK for Claude API access
+    P...
+  - Keywords: ClaudeModel, has, Uses, SDK, API
+  - Size: 2837 chars (~709 tokens)
+
+#### `.github\mcp-servers\unified-dev\models\codex.py`
+
+- **python_class_fc02a749_11** (python_class, L11-116)
+  - Summary: OpenAI GPT-4/Codex integration
+
+    Fallback model when user has OpenAI credits...
+  - Keywords: GPT, has, credits, integration, config
+  - Size: 3187 chars (~796 tokens)
+
+#### `.github\mcp-servers\unified-dev\models\custom.py`
+
+- **python_class_e9b6db81_12** (python_class, L12-149)
+  - Summary: Custom model provider integration
+
+    Supports:
+    - OpenRouter (https://openr...
+  - Keywords: Supports, API, OpenAI, etc, compatible
+  - Size: 4230 chars (~1057 tokens)
+
+#### `.github\mcp-servers\unified-dev\server.py`
+
+- **python_function_44ecd9fc_63** (python_function, L63-83)
+  - Summary: Get the project root path....
+  - Keywords: the, _project_root, project, Get, Path
+  - Size: 634 chars (~158 tokens)
+- **python_function_a997dd3a_84** (python_function, L84-104)
+  - Summary: Initialize RAG pipeline....
+  - Keywords: getenv, Initialize, pipeline, RAG, _rag_pipeline
+  - Size: 652 chars (~163 tokens)
+- **python_function_43fb7b30_105** (python_function, L105-120)
+  - Summary: Initialize memory service....
+  - Keywords: Initialize, initialize_memory, MemoryService, config, load_rag_config
+  - Size: 496 chars (~124 tokens)
+- **python_function_bf3415e9_121** (python_function, L121-155)
+  - Summary: Load an agent's markdown content....
+  - Keywords: Map, load_agent, agent, _agents_loaded, str
+  - Size: 1054 chars (~263 tokens)
+
+#### `.github\mcp-servers\unified-dev\tools\memory_tools.py`
+
+- **python_function_c3ca239b_27** (python_function, L27-48)
+  - Summary: Initialize Memory service from Agent 3's work
+
+    Args:
+        project_root_pa...
+  - Keywords: Initialize, initialize_memory, project, work, Memory
+  - Size: 670 chars (~167 tokens)
+
+#### `.github\mcp-servers\unified-dev\tools\model_tools.py`
+
+- **python_function_971c7e2b_14** (python_function, L14-26)
+  - Summary: Initialize model manager with configuration
+
+    Args:
+        config: Models co...
+  - Keywords: json, dict, Initialize, manager, with
+  - Size: 274 chars (~68 tokens)
+
+#### `.github\mcp-servers\unified-dev\tools\rag_tools.py`
+
+- **python_function_e51d3176_23** (python_function, L23-51)
+  - Summary: Initialize RAG system from Agent 3's work
+
+    Args:
+        project_root_path: ...
+  - Keywords: Initialize, RAG, _rag_pipeline, project, work
+  - Size: 874 chars (~218 tokens)
+- **python_function_ba82b211_173** (python_function, L173-229)
+  - Summary: Parse stack trace to extract frames
+
+    Args:
+        stack_trace: Stack trace ...
+  - Keywords: Stack, _parse_stack_trace, stack_trace, Args, stack
+  - Size: 2020 chars (~505 tokens)
+
+#### `.github\mcp-servers\unified-dev\utils\error_handler.py`
+
+- **python_class_1ad4b501_16** (python_class, L16-24)
+  - Summary: Structured error response...
+  - Keywords: error_type, traceback, details, ErrorResponse, str
+  - Size: 211 chars (~52 tokens)
+- **python_function_b0b6ca5c_25** (python_function, L25-82)
+  - Summary: Decorator for robust tool error handling
+
+    Wraps tool functions to catch exce...
+  - Keywords: func, and, Prevents, handle_tool_error, Decorator
+  - Size: 1988 chars (~497 tokens)
+- **python_function_20b08b54_83** (python_function, L83-101)
+  - Summary: Format exception as structured error response
+
+    Args:
+        error: Exceptio...
+  - Keywords: format_error_response, Additional, str, occurred, structured
+  - Size: 513 chars (~128 tokens)
+- **python_class_1e471f84_102** (python_class, L102-111)
+  - Summary: Custom exception for tool execution failures...
+  - Keywords: failures, Custom, ToolExecutionError, pass, when
+  - Size: 210 chars (~52 tokens)
+- **python_class_87302629_112** (python_class, L112-120)
+  - Summary: Exception when RAG system not properly initialized...
+  - Keywords: RAG, pass, MemoryServiceError, when, operations
+  - Size: 210 chars (~52 tokens)
+
+#### `.github\mcp-servers\unified-dev\utils\validation.py`
+
+- **python_class_4d35cba1_10** (python_class, L10-27)
+  - Summary: Input validation for search_code tool...
+  - Keywords: SearchCodeInput, Input, n_results, min_length, description
+  - Size: 706 chars (~176 tokens)
+- **python_class_c9318b3f_28** (python_class, L28-42)
+  - Summary: Input validation for save_memory tool...
+  - Keywords: SaveMemoryInput, Input, min_length, str, session_id
+  - Size: 651 chars (~162 tokens)
+- **python_class_e7eb1b7d_43** (python_class, L43-55)
+  - Summary: Input validation for search_memory tool...
+  - Keywords: Input, tool, SearchMemoryInput, min_length, None
+  - Size: 469 chars (~117 tokens)
+- **python_class_88bac284_56** (python_class, L56-61)
+  - Summary: Input validation for enhance_query tool...
+  - Keywords: Input, EnhanceQueryInput, min_length, str, session_id
+  - Size: 208 chars (~52 tokens)
+- **python_class_fc4b9bae_62** (python_class, L62-76)
+  - Summary: Input validation for execute_with_model tool...
+  - Keywords: task, Input, execute, min_length, description
+  - Size: 654 chars (~163 tokens)
+- **python_class_49af1ac9_77** (python_class, L77-88)
+  - Summary: Input validation for switch_model tool...
+  - Keywords: cls, switch_model, Input, description, str
+  - Size: 401 chars (~100 tokens)
+- **python_function_d4080f82_89** (python_function, L89-107)
+  - Summary: Validate input data against Pydantic model
+
+    Args:
+        input_class: Pydan...
+  - Keywords: data, Validate, input_class, Args, str
+  - Size: 502 chars (~125 tokens)
+
+#### `.github\rag\adaptive_rag.py`
+
+- **python_class_a6a9afa2_31** (python_class, L31-58)
+  - Summary: Detected interface types...
+  - Keywords: API, GitHub, types, InterfaceType, bedrock
+  - Size: 878 chars (~219 tokens)
+- **python_class_5a550125_60** (python_class, L60-98)
+  - Summary: Detected environment context - like Kubernetes pod context...
+  - Keywords: InterfaceType, interface, EnvironmentContext, features, like
+  - Size: 1136 chars (~284 tokens)
+- **python_class_1bbe16e6_99** (python_class, L99-256)
+  - Summary: Detects the runtime environment - like Kubernetes service discovery...
+  - Keywords: InterfaceType, the, which, interface, staticmethod
+  - Size: 5895 chars (~1473 tokens)
+- **python_class_fa82d595_257** (python_class, L257-273)
+  - Summary: Base class for interface adapters - like Kubernetes ingress controllers
+    Each...
+  - Keywords: interface, how, Base, controllers, serve
+  - Size: 481 chars (~120 tokens)
+- **python_class_85660fd2_274** (python_class, L274-352)
+  - Summary: REST API adapter using FastAPI...
+  - Keywords: FastAPI, REST, API, RESTAdapter, str
+  - Size: 2560 chars (~640 tokens)
+- **python_class_a8a4fc1f_353** (python_class, L353-392)
+  - Summary: STDIN/STDOUT adapter for CLI and pipe usage...
+  - Keywords: rag_engine, and, serve, usage, None
+  - Size: 1296 chars (~324 tokens)
+- **python_class_91a60bcb_393** (python_class, L393-422)
+  - Summary: File injection adapter for GitHub Copilot and similar tools.
+    Writes context ...
+  - Keywords: read, files, and, Writes, similar
+  - Size: 1099 chars (~274 tokens)
+- **python_class_5a2087fa_477** (python_class, L477-666)
+  - Summary: The main adaptive RAG engine - like Kubernetes controller
+    Auto-configures ba...
+  - Keywords: environment, configures, RAG, engine, based
+  - Size: 6859 chars (~1714 tokens)
+- **python_function_37e618f9_667** (python_function, L667-737)
+  - Summary: Main entry point...
+  - Keywords: entry, RAG, System, project, argparse
+  - Size: 2674 chars (~668 tokens)
+
+#### `.github\rag\ai_enforcer.py`
+
+- **python_class_f96c2d44_38** (python_class, L38-58)
+  - Summary: Actions the enforcer can take....
+  - Keywords: the, FLAG, REJECT, can, MERGE
+  - Size: 438 chars (~109 tokens)
+- **python_class_f529c234_60** (python_class, L60-87)
+  - Summary: Analysis of a single chunk....
+  - Keywords: float, chunk, keywords, quality_score, single
+  - Size: 631 chars (~157 tokens)
+- **python_class_2b05ed62_88** (python_class, L88-95)
+  - Summary: Supported AI providers....
+  - Keywords: AIProvider, providers, Supported, GEMINI, Enum
+  - Size: 161 chars (~40 tokens)
+- **python_class_de5b6ae1_96** (python_class, L96-309)
+  - Summary: Universal AI client that works with multiple providers.
+    Auto-detects availab...
+  - Keywords: providers, Universal, configured, with, based
+  - Size: 8001 chars (~2000 tokens)
+- **python_class_bdcff58e_455** (python_class, L455-725)
+  - Summary: Enforcer agent that uses any available AI to validate and improve RAG indexing.
+...
+  - Keywords: the, and, where, pattern, reviews
+  - Size: 9917 chars (~2479 tokens)
+
+#### `.github\rag\bootstrap.py`
+
+- **python_class_f42fd803_43** (python_class, L43-442)
+  - Summary: Orchestrates the first-run initialization of the Universal Context Template.
+   ...
+  - Keywords: the, Universal, Context, safe, Template
+  - Size: 14422 chars (~3605 tokens)
+- **python_function_b139ae10_443** (python_function, L443-494)
+  - Summary: CLI entry point for bootstrap....
+  - Keywords: Universal, Context, entry, Template, argparse
+  - Size: 1528 chars (~382 tokens)
+
+#### `.github\rag\chunking_strategy.py`
+
+- **python_class_7d18be4d_19** (python_class, L19-48)
+  - Summary: Types of code chunks...
+  - Keywords: spring_entity, code, spring_config, SPRING_CONFIG, Types
+  - Size: 759 chars (~189 tokens)
+- **python_class_3b82b086_50** (python_class, L50-78)
+  - Summary: Represents a chunk of code for RAG indexing
+
+    Attributes:
+        id: Unique ...
+  - Keywords: Represents, chunk, the, CodeChunk, RAG
+  - Size: 863 chars (~215 tokens)
+- **python_class_59bd5432_79** (python_class, L79-343)
+  - Summary: Specialized chunker for Java Spring Boot projects
+    Recognizes Spring annotati...
+  - Keywords: Recognizes, and, structures, RestController, detect
+  - Size: 10311 chars (~2577 tokens)
+- **python_class_8ec904e7_344** (python_class, L344-458)
+  - Summary: Chunker for Python files with FastAPI support...
+  - Keywords: FastAPI, files, PythonChunker, support, CodeChunk
+  - Size: 4037 chars (~1009 tokens)
+- **python_class_18d4f156_459** (python_class, L459-489)
+  - Summary: Chunker for TypeScript/JavaScript files...
+  - Keywords: files, classes, and, CodeChunk, functions
+  - Size: 1173 chars (~293 tokens)
+- **python_class_942b5864_490** (python_class, L490-541)
+  - Summary: Chunker for Markdown documentation...
+  - Keywords: Markdown, CodeChunk, headers, lines, documentation
+  - Size: 1859 chars (~464 tokens)
+- **python_class_f4fbe526_542** (python_class, L542-657)
+  - Summary: Universal code chunking strategy for any project
+    Automatically detects file ...
+  - Keywords: Universal, and, file, strategy, Automatically
+  - Size: 3583 chars (~895 tokens)
+
+#### `.github\rag\config.py`
+
+- **python_class_a5949d50_19** (python_class, L19-145)
+  - Summary: Configuration for the RAG system with Mem0 and vector storage
+
+    Environment V...
+  - Keywords: Mem0, the, and, Which, RAG
+  - Size: 4900 chars (~1225 tokens)
+- **python_function_53c89acd_146** (python_function, L146-199)
+  - Summary: Load configuration from environment variables with sensible defaults
+
+    Return...
+  - Keywords: defaults, with, sensible, ValueError, Validated
+  - Size: 2038 chars (~509 tokens)
+- **python_function_9bc0ffd4_200** (python_function, L200-228)
+  - Summary: Print a human-readable summary of the current configuration
+
+    Args:
+        c...
+  - Keywords: the, summarize, Universal, RAG, print_config_summary
+  - Size: 1056 chars (~264 tokens)
+
+#### `.github\rag\context7_integration.py`
+
+- **python_class_8f38bfd7_25** (python_class, L25-33)
+  - Summary: Types of queries for routing decisions...
+  - Keywords: local_code, about, Enum, queries, Types
+  - Size: 373 chars (~93 tokens)
+- **python_class_37afff52_35** (python_class, L35-65)
+  - Summary: Result from Context7 query...
+  - Keywords: Context7, timestamp, Context7Result, documentation, None
+  - Size: 961 chars (~240 tokens)
+- **python_class_c0b22f95_66** (python_class, L66-140)
+  - Summary: Local cache for Context7 results to reduce API calls...
+  - Keywords: Context7, reduce, Context7Cache, results, cache_dir
+  - Size: 2703 chars (~675 tokens)
+- **python_class_d03ffea1_166** (python_class, L166-260)
+  - Summary: Classifies queries to determine if Context7 should be invoked...
+  - Keywords: Context7, queries, should, Path, str
+  - Size: 3429 chars (~857 tokens)
+- **python_class_47842d43_261** (python_class, L261-427)
+  - Summary: Main integration class for Context7 with RAG pipeline
+
+    Usage:
+        from ....
+  - Keywords: Context7, with, Context7Integration, RAG, pipeline
+  - Size: 5532 chars (~1383 tokens)
+- **python_function_2a0c37fb_429** (python_function, L429-449)
+  - Summary: Create a Context7-enhanced RAG pipeline
+
+    Usage:
+        from .context7_integ...
+  - Keywords: Context7, how, Create, RAG, enhanced
+  - Size: 675 chars (~168 tokens)
+
+#### `.github\rag\conventions_analyzer.py`
+
+- **python_class_dd3c81ca_25** (python_class, L25-44)
+  - Summary: Naming convention styles...
+  - Keywords: styles, CAMEL_CASE, KEBAB_CASE, case, SCREAMING_SNAKE
+  - Size: 492 chars (~123 tokens)
+- **python_class_bf2226bf_46** (python_class, L46-197)
+  - Summary: Complete project conventions...
+  - Keywords: project, language, str, List, rules
+  - Size: 5975 chars (~1493 tokens)
+- **python_class_d8c1d059_198** (python_class, L198-812)
+  - Summary: Analyzes codebase to detect coding conventions...
+  - Keywords: directories, Analyzes, lib, ConventionsAnalyzer, src
+  - Size: 23290 chars (~5822 tokens)
+- **python_function_953d32d5_813** (python_function, L813-826)
+  - Summary: Convenience function to analyze a project
+
+    Args:
+        project_root: Path ...
+  - Keywords: Args, project, ConventionsAnalyzer, Path, str
+  - Size: 306 chars (~76 tokens)
+- **python_function_e000edc2_827** (python_function, L827-869)
+  - Summary: Save conventions to file, optionally merging with existing content.
+
+    IMPORTA...
+  - Keywords: IMPORTANT, existing, file, with, merging
+  - Size: 1931 chars (~482 tokens)
+- **python_function_a31951e0_870** (python_function, L870-900)
+  - Summary: Check if a conventions file has user customizations.
+
+    Args:
+        content:...
+  - Keywords: Existing, _has_user_customizations, has, file, Check
+  - Size: 704 chars (~176 tokens)
+- **python_function_dd54993e_901** (python_function, L901-956)
+  - Summary: Merge new auto-detected conventions with existing content.
+
+    Strategy:
+    - ...
+  - Keywords: Strategy, Merge, with, auto, str
+  - Size: 1785 chars (~446 tokens)
+- **python_function_5ff321f3_957** (python_function, L957-987)
+  - Summary: Parse markdown content into sections by header.
+
+    Args:
+        content: Mark...
+  - Keywords: Markdown, into, Args, _parse_markdown_sections, header
+  - Size: 772 chars (~193 tokens)
+
+#### `.github\rag\memory_service.py`
+
+- **python_class_0448cba1_14** (python_class, L14-22)
+  - Summary: Types of memories tracked by the system...
+  - Keywords: the, CODE_CONTEXT, memories, Types, accessed
+  - Size: 400 chars (~100 tokens)
+- **python_class_e7b17d4e_24** (python_class, L24-66)
+  - Summary: Represents a single memory entry
+
+    Attributes:
+        id: Unique identifier
+...
+  - Keywords: decision, Represents, session, entry, Unique
+  - Size: 1306 chars (~326 tokens)
+- **python_class_393d87b5_67** (python_class, L67-517)
+  - Summary: Manages persistent memory using Mem0
+
+    Hybrid Approach:
+    - Session Memory:...
+  - Keywords: sessions, Approach, persistent, Remember, MemoryService
+  - Size: 14072 chars (~3518 tokens)
+
+#### `.github\rag\progress_display.py`
+
+- **python_class_89719bb1_38** (python_class, L38-56)
+  - Summary: Status of an indexing phase....
+  - Keywords: about, Enum, pending, ERROR, RUNNING
+  - Size: 357 chars (~89 tokens)
+- **python_class_7824d98a_57** (python_class, L57-189)
+  - Summary: Basic progress display using print statements....
+  - Keywords: Basic, BasicProgressDisplay, display, str, current_phase
+  - Size: 4531 chars (~1132 tokens)
+- **python_class_aa33e337_190** (python_class, L190-335)
+  - Summary: Rich progress display with fancy formatting....
+  - Keywords: fancy, Console, with, display, Rich
+  - Size: 5393 chars (~1348 tokens)
+- **python_class_8801c03a_336** (python_class, L336-347)
+  - Summary: Factory that returns appropriate display based on environment....
+  - Keywords: Factory, staticmethod, Create, based, create
+  - Size: 424 chars (~106 tokens)
+- **python_class_e1ca135a_348** (python_class, L348-399)
+  - Summary: Progress callback implementation that connects RAGOrchestrator
+    to the visual...
+  - Keywords: visual, the, connects, Progress, display
+  - Size: 1913 chars (~478 tokens)
+
+#### `.github\rag\project_wizard.py`
+
+- **python_class_33577c54_21** (python_class, L21-56)
+  - Summary: Supported project languages...
+  - Keywords: python, rust, languages, CSHARP, javascript
+  - Size: 673 chars (~168 tokens)
+- **python_class_20513575_58** (python_class, L58-185)
+  - Summary: Project configuration from wizard...
+  - Keywords: name, variable_style, snake_case, language, wizard
+  - Size: 4814 chars (~1203 tokens)
+- **python_class_e33cfa8f_186** (python_class, L186-529)
+  - Summary: Interactive project setup wizard...
+  - Keywords: defaults, setup, project, JAVA, variable_style
+  - Size: 13234 chars (~3308 tokens)
+- **python_function_bdf5e1f4_676** (python_function, L676-692)
+  - Summary: Run the project wizard
+
+    Args:
+        project_root: Path to project root
+   ...
+  - Keywords: the, run_wizard, config, Run, project
+  - Size: 419 chars (~104 tokens)
+
+#### `.github\rag\rag_agents.py`
+
+- **python_class_45fbbf06_28** (python_class, L28-47)
+  - Summary: Roles for specialized agents....
+  - Keywords: COVERAGE, content_analyzer, relationship, Enum, specialized
+  - Size: 540 chars (~135 tokens)
+- **python_class_ff27e66d_49** (python_class, L49-58)
+  - Summary: Report from a single agent's analysis....
+  - Keywords: float, passed, agent, analysis, single
+  - Size: 347 chars (~86 tokens)
+- **python_class_f13066ec_59** (python_class, L59-97)
+  - Summary: Base class for all RAG agents....
+  - Keywords: Base, RAG, role, AgentRole, findings
+  - Size: 1078 chars (~269 tokens)
+- **python_class_b85d35f4_98** (python_class, L98-236)
+  - Summary: Analyzes content types and structures in the codebase.
+
+    Responsibilities:
+  ...
+  - Keywords: the, and, docs, structures, Analyzes
+  - Size: 5311 chars (~1327 tokens)
+- **python_class_bbb870c9_237** (python_class, L237-402)
+  - Summary: Validates chunk quality and coherence.
+
+    Responsibilities:
+    - Check chunk ...
+  - Keywords: Validate, chunk, BaseRAGAgent, and, Check
+  - Size: 5536 chars (~1384 tokens)
+- **python_class_2506d701_403** (python_class, L403-512)
+  - Summary: Validates index completeness and accuracy.
+
+    Responsibilities:
+    - Verify a...
+  - Keywords: index, files, and, important, Validate
+  - Size: 3787 chars (~946 tokens)
+- **python_class_9f912494_513** (python_class, L513-612)
+  - Summary: Ensures comprehensive coverage of all content types.
+
+    Responsibilities:
+    ...
+  - Keywords: important, files, CoverageAgent, covered, coverage
+  - Size: 3201 chars (~800 tokens)
+- **python_class_d9a206ba_613** (python_class, L613-753)
+  - Summary: Detects and validates relationships between chunks.
+
+    Responsibilities:
+    -...
+  - Keywords: RelationshipAgent, and, Find, Detects, code
+  - Size: 5383 chars (~1345 tokens)
+- **python_class_ede7771d_754** (python_class, L754-822)
+  - Summary: Coordinates multiple specialized RAG agents for comprehensive analysis....
+  - Keywords: RelationshipAgent, CoverageAgent, specialized, RAG, ContentAnalyzerAgent
+  - Size: 2274 chars (~568 tokens)
+
+#### `.github\rag\rag_orchestrator.py`
+
+- **python_class_b8250de6_35** (python_class, L35-53)
+  - Summary: Target chunk counts based on codebase size....
+  - Keywords: files, chunk, size, Enum, based
+  - Size: 497 chars (~124 tokens)
+- **python_class_49a1c55f_55** (python_class, L55-70)
+  - Summary: Statistics about the indexing process....
+  - Keywords: the, process, about, default_factory, dict
+  - Size: 550 chars (~137 tokens)
+- **python_class_b034ba87_72** (python_class, L72-101)
+  - Summary: Human-readable entry for chunk manifest....
+  - Keywords: chunk_type, chunk, category, entry, manifest
+  - Size: 796 chars (~199 tokens)
+- **python_class_282aa701_102** (python_class, L102-120)
+  - Summary: Callback interface for progress updates....
+  - Keywords: interface, on_progress, total, pass, current
+  - Size: 488 chars (~122 tokens)
+- **python_class_c107766a_121** (python_class, L121-671)
+  - Summary: Master orchestrator for RAG indexing with enforcer pattern.
+
+    Implements adap...
+  - Keywords: visual, pattern, size, RAG, with
+  - Size: 21084 chars (~5271 tokens)
+
+#### `.github\rag\rag_pipeline.py`
+
+- **python_function_1df46a63_39** (python_function, L39-66)
+  - Summary: Load actual chunk content from files....
+  - Keywords: files, chunk, manifest, chunks_content, Path
+  - Size: 1024 chars (~256 tokens)
+- **python_function_fca5da58_67** (python_function, L67-290)
+  - Summary: Main entry point....
+  - Keywords: quiet, run_pipeline, output_dir, run_enforcer, run_full
+  - Size: 426 chars (~106 tokens)
+
+#### `.github\rag\startup_display.py`
+
+- **python_class_d3a580b7_21** (python_class, L21-32)
+  - Summary: class Colors:...
+  - Keywords: Colors, BLUE, DIM, RED, GREEN
+  - Size: 213 chars (~53 tokens)
+- **python_function_c74f3a54_33** (python_function, L33-83)
+  - Summary: Get RAG system statistics...
+  - Keywords: total_documents, get_rag_stats, root, RAG, stats
+  - Size: 1721 chars (~430 tokens)
+- **python_function_5ab3b7e3_84** (python_function, L84-117)
+  - Summary: Get Context7 integration statistics...
+  - Keywords: Context7, enabled, mcp_configured, root, stats
+  - Size: 956 chars (~239 tokens)
+- **python_function_99fa7d00_118** (python_function, L118-158)
+  - Summary: Count source files by type...
+  - Keywords: files, root, get_file_counts, python, Path
+  - Size: 1059 chars (~264 tokens)
+- **python_function_568ba964_159** (python_function, L159-242)
+  - Summary: Display the startup banner with RAG statistics...
+  - Keywords: Colors, the, with, RAG, NoColors
+  - Size: 3522 chars (~880 tokens)
+- **python_function_c558aab0_243** (python_function, L243-252)
+  - Summary: Get startup information as JSON (for programmatic use)...
+  - Keywords: get_rag_stats, information, rag, context7, Get
+  - Size: 338 chars (~84 tokens)
+- **python_function_e9010f91_253** (python_function, L253-281)
+  - Summary: CLI entry point...
+  - Keywords: root, entry, RAG, project, Display
+  - Size: 710 chars (~177 tokens)
+
+#### `.github\rag\vector_database.py`
+
+- **python_class_298439c1_18** (python_class, L18-26)
+  - Summary: Supported vector database providers...
+  - Keywords: providers, chroma, database, PINECONE, QDRANT
+  - Size: 246 chars (~61 tokens)
+- **python_class_3c1f0dfd_27** (python_class, L27-57)
+  - Summary: Abstract base class for vector databases...
+  - Keywords: embedding_model, databases, Abstract, vector, embedder
+  - Size: 977 chars (~244 tokens)
+- **python_class_e23dc32b_58** (python_class, L58-139)
+  - Summary: Local ChromaDB implementation...
+  - Keywords: code_chunks, persist_directory, collection_name, ChromaVectorDatabase, chroma_db
+  - Size: 2836 chars (~709 tokens)
+- **python_class_cee72464_140** (python_class, L140-315)
+  - Summary: Supabase (PostgreSQL + pgvector) implementation
+    Cloud-based vector storage w...
+  - Keywords: Supabase, vector, storage, based, with
+  - Size: 6135 chars (~1533 tokens)
+- **python_class_4b821b97_316** (python_class, L316-338)
+  - Summary: Factory to create the appropriate vector database...
+  - Keywords: Factory, the, Create, vector, Args
+  - Size: 756 chars (~189 tokens)
+- **python_class_2d1495ba_339** (python_class, L339-383)
+  - Summary: Unified RAG pipeline that works with any vector database provider...
+  - Keywords: pipeline, RAG, with, vector, database
+  - Size: 1397 chars (~349 tokens)
+
+#### `install.py`
+
+- **python_function_2bc8e7e8_34** (python_function, L34-51)
+  - Summary: Print welcome banner....
+  - Keywords: FedRAMP, Installer, Universal, Context, Template
+  - Size: 480 chars (~120 tokens)
+- **python_function_cb732365_52** (python_function, L52-110)
+  - Summary: Extract template from Docker image to local path....
+  - Keywords: target_path, image, Extracting, Path, local
+  - Size: 1851 chars (~462 tokens)
+- **python_function_7deed25c_111** (python_function, L111-167)
+  - Summary: Download and extract template from GitHub....
+  - Keywords: and, target_path, install_from_github, ZipFile, Path
+  - Size: 1913 chars (~478 tokens)
+- **python_function_90184b4f_168** (python_function, L168-199)
+  - Summary: Copy template from local source....
+  - Keywords: install_from_local, exists, target_path, Path, local
+  - Size: 1032 chars (~258 tokens)
+- **python_function_04b45c52_200** (python_function, L200-247)
+  - Summary: Create a basic README for the project....
+  - Keywords: the, exists, target_path, Create, readme_path
+  - Size: 412 chars (~103 tokens)
+- **python_function_55b47f17_283** (python_function, L283-287)
+  - Summary: def main():...
+  - Keywords: Installer, Universal, Context, Template, Quick
+  - Size: 198 chars (~49 tokens)
+
+
+---
+
+## Fine-Tuning Guide
+
+To adjust chunking:
+
+1. **Merge chunks**: Edit `index_manifest.json`, combine chunk IDs
+2. **Split chunks**: Mark chunks for re-processing with finer granularity
+3. **Exclude chunks**: Add chunk IDs to `excluded_chunks` array
+4. **Re-categorize**: Update `category` field in chunk entries
+
+After editing, run: `python -m .github.rag.rag_orchestrator --rebuild`

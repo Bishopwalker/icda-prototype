@@ -1,17 +1,28 @@
+import logging
 import os
+from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
 
 from .database import CustomerDB
+from .agents import QueryOrchestrator, create_query_orchestrator
+
+logger = logging.getLogger(__name__)
 
 
 class NovaClient:
     """
     Amazon Bedrock Nova client for AI-powered queries.
     Gracefully handles missing AWS credentials.
+
+    Supports two modes:
+    1. Simple mode: Direct tool calling with 3 static tools
+    2. Orchestrated mode: 8-agent pipeline with dynamic tools
+
+    The orchestrated mode is enabled by default when available.
     """
-    __slots__ = ("client", "model", "available", "db")
+    __slots__ = ("client", "model", "available", "db", "_orchestrator", "_use_orchestrator")
 
     _PROMPT = """You are ICDA, a customer data assistant. Be concise and helpful.
 
@@ -36,25 +47,70 @@ QUERY INTERPRETATION:
             "inputSchema": {"json": {"type": "object", "properties": {}}}}}
     ]
 
-    def __init__(self, region: str, model: str, db: CustomerDB):
+    def __init__(
+        self,
+        region: str,
+        model: str,
+        db: CustomerDB,
+        vector_index=None,
+        knowledge=None,
+        address_orchestrator=None,
+        session_store=None,
+        guardrails=None,
+        use_orchestrator: bool = True,
+    ):
+        """Initialize NovaClient with optional 8-agent pipeline.
+
+        Args:
+            region: AWS region for Bedrock.
+            model: Bedrock model ID.
+            db: CustomerDB instance.
+            vector_index: Optional VectorIndex for semantic search.
+            knowledge: Optional KnowledgeManager for RAG.
+            address_orchestrator: Optional address verification orchestrator.
+            session_store: Optional session store for context.
+            guardrails: Optional Guardrails for PII filtering.
+            use_orchestrator: Whether to use 8-agent pipeline (default True).
+        """
         self.model = model
         self.db = db
         self.client = None
         self.available = False
+        self._orchestrator = None
+        self._use_orchestrator = use_orchestrator
 
         # Check if AWS credentials are configured
         if not os.environ.get("AWS_ACCESS_KEY_ID") and not os.environ.get("AWS_PROFILE"):
-            print("Nova: No AWS credentials - AI features disabled (LITE MODE)")
+            logger.info("Nova: No AWS credentials - AI features disabled (LITE MODE)")
             return
 
         try:
             self.client = boto3.client("bedrock-runtime", region_name=region)
             self.available = True
-            print(f"Nova: Connected ({model})")
+            logger.info(f"Nova: Connected ({model})")
+
+            # Initialize 8-agent orchestrator if enabled
+            if use_orchestrator:
+                try:
+                    self._orchestrator = create_query_orchestrator(
+                        db=db,
+                        region=region,
+                        model=model,
+                        vector_index=vector_index,
+                        knowledge=knowledge,
+                        address_orchestrator=address_orchestrator,
+                        session_store=session_store,
+                        guardrails=guardrails,
+                    )
+                    logger.info("Nova: 8-agent orchestrator enabled")
+                except Exception as e:
+                    logger.warning(f"Nova: Orchestrator init failed, using simple mode - {e}")
+                    self._orchestrator = None
+
         except NoCredentialsError:
-            print("Nova: AWS credentials not found - AI features disabled")
+            logger.warning("Nova: AWS credentials not found - AI features disabled")
         except Exception as e:
-            print(f"Nova: Init failed - {e}")
+            logger.error(f"Nova: Init failed - {e}")
 
     def _converse(self, messages: list, context: str | None = None) -> dict:
         system_prompts = [{"text": self._PROMPT}]
@@ -69,24 +125,105 @@ QUERY INTERPRETATION:
             inferenceConfig={"maxTokens": 4096, "temperature": 0.1}
         )
 
-    async def query(self, text: str, history: list[dict] | None = None, context: str | None = None) -> dict:
-        """
-        Query Nova with optional conversation history and RAG context.
+    async def query(
+        self,
+        text: str,
+        history: list[dict] | None = None,
+        context: str | None = None,
+        session_id: str | None = None,
+        use_orchestrator: bool | None = None,
+    ) -> dict:
+        """Query Nova with optional conversation history and RAG context.
+
+        When the 8-agent orchestrator is available, it handles:
+        - Intent classification
+        - Dynamic tool selection
+        - Quality enforcement
+        - PII redaction
+
+        Falls back to simple 3-tool mode if orchestrator is unavailable.
 
         Args:
-            text: The user's query
-            history: Previous messages in Bedrock format
-            context: Retrieved RAG context to augment the query
+            text: The user's query.
+            history: Previous messages in Bedrock format.
+            context: Retrieved RAG context to augment the query.
+            session_id: Optional session ID for context tracking.
+            use_orchestrator: Override orchestrator usage (None = use default).
 
         Returns:
-            dict with success, response, and optional tool used
+            dict with success, response, and optional metadata.
         """
         if not self.available:
             return {
-                "success": False, 
+                "success": False,
                 "error": "AI features not available (no AWS credentials). Running in LITE MODE - use /api/search or /api/autocomplete endpoints."
             }
 
+        # Determine whether to use orchestrator
+        should_use_orchestrator = (
+            use_orchestrator if use_orchestrator is not None
+            else (self._use_orchestrator and self._orchestrator is not None)
+        )
+
+        # Use 8-agent pipeline when available
+        if should_use_orchestrator and self._orchestrator:
+            return await self._query_orchestrated(text, session_id)
+
+        # Fall back to simple mode
+        return await self._query_simple(text, history, context)
+
+    async def _query_orchestrated(
+        self,
+        text: str,
+        session_id: str | None = None,
+    ) -> dict:
+        """Process query through 8-agent pipeline.
+
+        Args:
+            text: The user's query.
+            session_id: Optional session ID.
+
+        Returns:
+            dict with response and metadata.
+        """
+        try:
+            result = await self._orchestrator.process(
+                query=text,
+                session_id=session_id,
+                trace_enabled=True,
+            )
+
+            return {
+                "success": result.success,
+                "response": result.response,
+                "tool": ", ".join(result.tools_used) if result.tools_used else None,
+                "route": result.route,
+                "quality_score": result.quality_score,
+                "latency_ms": result.latency_ms,
+                "metadata": result.metadata,
+            }
+
+        except Exception as e:
+            logger.error(f"Orchestrator query failed: {e}", exc_info=True)
+            # Fall back to simple mode on error
+            return await self._query_simple(text, None, None)
+
+    async def _query_simple(
+        self,
+        text: str,
+        history: list[dict] | None = None,
+        context: str | None = None,
+    ) -> dict:
+        """Process query with simple 3-tool mode (original implementation).
+
+        Args:
+            text: The user's query.
+            history: Previous messages in Bedrock format.
+            context: Retrieved RAG context.
+
+        Returns:
+            dict with success, response, and optional tool used.
+        """
         try:
             # Build messages: history + current query
             # Filter history to ensure only text content (no toolUse blocks that would require toolResult)
@@ -142,6 +279,15 @@ QUERY INTERPRETATION:
             return {"success": False, "error": str(e)}
 
     def _execute_tool(self, name: str, params: dict) -> dict:
+        """Execute a tool by name (simple mode only).
+
+        Args:
+            name: Tool name.
+            params: Tool parameters.
+
+        Returns:
+            Tool execution result.
+        """
         match name:
             case "lookup_crid":
                 return self.db.lookup(params.get("crid", ""))
@@ -153,3 +299,26 @@ QUERY INTERPRETATION:
             case "get_stats":
                 return self.db.stats()
         return {"success": False, "error": f"Unknown tool: {name}"}
+
+    def get_stats(self) -> dict[str, Any]:
+        """Get client statistics including orchestrator info.
+
+        Returns:
+            Dict with client and orchestrator stats.
+        """
+        stats = {
+            "available": self.available,
+            "model": self.model,
+            "mode": "orchestrated" if (self._use_orchestrator and self._orchestrator) else "simple",
+            "simple_tools": [t["toolSpec"]["name"] for t in self.TOOLS],
+        }
+
+        if self._orchestrator:
+            stats["orchestrator"] = self._orchestrator.get_stats()
+
+        return stats
+
+    @property
+    def orchestrator(self) -> QueryOrchestrator | None:
+        """Get the underlying orchestrator if available."""
+        return self._orchestrator

@@ -64,22 +64,34 @@ class Router:
                 return self._response(q, response, RouteType.DATABASE, start, tool=tool, session_id=session.session_id)
             route_type = RouteType.NOVA
 
-        # 5. Nova for complex queries - pass conversation history and RAG context
+        # 5. Nova for complex queries - uses 8-agent pipeline when available
+        # The orchestrator handles:
+        # - Intent classification
+        # - Dynamic tool selection
+        # - Parallel search + knowledge retrieval
+        # - Quality enforcement and PII redaction
         history = session.get_history(max_messages=20) if session.messages else None
-        
-        # RAG Retrieval: Fetch relevant customer context
-        context = None
-        rag_result = await self.vector_index.search_customers_semantic(q, limit=5)
-        if rag_result["success"] and rag_result["count"] > 0:
-            customers = rag_result["data"]
-            context_lines = ["Found relevant customer records:"]
-            for c in customers:
-                # Format each customer record for the LLM
-                context_lines.append(f"- {c['name']} (CRID: {c['crid']}): {c['city']}, {c['state']}, {c['move_count']} moves. Status: {c['status']}")
-            context = "\n".join(context_lines)
 
-        result = await self.nova.query(q, history=history, context=context)
-        
+        # RAG context is now handled by the KnowledgeAgent in orchestrated mode
+        # But we still provide fallback RAG for simple mode
+        context = None
+        if not self.nova.orchestrator:
+            rag_result = await self.vector_index.search_customers_semantic(q, limit=5)
+            if rag_result["success"] and rag_result["count"] > 0:
+                customers = rag_result["data"]
+                context_lines = ["Found relevant customer records:"]
+                for c in customers:
+                    context_lines.append(f"- {c['name']} (CRID: {c['crid']}): {c['city']}, {c['state']}, {c['move_count']} moves. Status: {c['status']}")
+                context = "\n".join(context_lines)
+
+        # Pass session_id for orchestrator context tracking
+        result = await self.nova.query(
+            q,
+            history=history,
+            context=context,
+            session_id=session.session_id,
+        )
+
         if result["success"]:
             response = result["response"]
             # Update session
@@ -89,7 +101,16 @@ class Router:
             # Cache only standalone queries
             if len(session.messages) <= 2:
                 await self.cache.set(key, json.dumps({"response": response}))
-            return self._response(q, response, RouteType.NOVA, start, tool=result.get("tool"), session_id=session.session_id)
+            return self._response(
+                q,
+                response,
+                RouteType.NOVA,
+                start,
+                tool=result.get("tool"),
+                session_id=session.session_id,
+                quality_score=result.get("quality_score"),
+                nova_route=result.get("route"),
+            )
 
         return self._response(q, result.get("error", "Unknown error"), RouteType.NOVA, start, success=False, session_id=session.session_id)
 
@@ -115,7 +136,19 @@ class Router:
         return json.dumps(result)
 
     def _response(self, query: str, response: str, route: RouteType, start: float, **kwargs) -> dict:
-        return {
+        """Build response dict with optional orchestrator metadata.
+
+        Args:
+            query: Original query.
+            response: Response text.
+            route: Route type taken.
+            start: Start time for latency calculation.
+            **kwargs: Additional response fields.
+
+        Returns:
+            Response dict.
+        """
+        result = {
             "success": kwargs.get("success", True),
             "query": query,
             "response": response,
@@ -126,3 +159,11 @@ class Router:
             "latency_ms": int((time() - start) * 1000),
             "session_id": kwargs.get("session_id"),
         }
+
+        # Add orchestrator metadata if available
+        if kwargs.get("quality_score") is not None:
+            result["quality_score"] = kwargs["quality_score"]
+        if kwargs.get("nova_route"):
+            result["nova_route"] = kwargs["nova_route"]
+
+        return result

@@ -163,7 +163,7 @@ services:
   # ============================================
   mcp-server:
     build:
-      context: .claude/mcp-servers/unified-dev
+      context: .github/mcp-servers/unified-dev
       dockerfile: Dockerfile.unified
     image: icda-mcp:latest
     container_name: icda-mcp

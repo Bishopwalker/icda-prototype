@@ -1,0 +1,51 @@
+# ICDA MCP Server - Unified Dockerfile
+# Builds from .github/mcp-servers/unified-dev context
+# Project root mounted as volume at runtime
+
+FROM python:3.11-slim-bookworm
+
+LABEL org.opencontainers.image.title="ICDA MCP Server"
+LABEL org.opencontainers.image.description="Model Context Protocol server for ICDA prototype"
+LABEL org.opencontainers.image.version="2.2.0"
+
+# Security: Create non-root user
+RUN groupadd -g 10001 mcpuser && \
+    useradd -u 10001 -g mcpuser -s /bin/bash -m mcpuser
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+WORKDIR /app
+
+# Copy and install requirements (from unified-dev context)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy MCP server code
+COPY . /app/mcp-server/
+
+# Create data directories for persistence
+RUN mkdir -p /app/data/chroma /app/data/memory /app/project && \
+    chown -R mcpuser:mcpuser /app
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    MCP_SERVER_HOME=/app/mcp-server \
+    CHROMA_PERSIST_DIR=/app/data/chroma \
+    MEM0_MODE=local
+
+# Switch to non-root user
+USER mcpuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "print('healthy')" || exit 1
+
+# Default command - run MCP server
+WORKDIR /app/mcp-server
+CMD ["python", "server.py"]

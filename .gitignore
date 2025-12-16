@@ -21,8 +21,8 @@ dist/
 *.swp
 *.swo
 
-# Claude
-.claude/
+# AI Instructions (tracked - contains copilot-instructions.md and agents)
+# .github/ is NOT ignored - it contains GitHub workflows and AI config
 
 # Windows reserved names
 nul
@@ -33,3 +33,10 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Database files (large)
+chroma_db/
+*.sqlite3
+
+# Local settings (user-specific)
+settings.local.json

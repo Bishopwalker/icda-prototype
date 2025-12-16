@@ -75,9 +75,9 @@ Address Input → Normalizer → Vector Index → ZIP Database → Nova Complete
 ## Development Workflow
 
 ### 1. Pre-Development Setup
-1. Read `.claude/CLAUDE.md` for development standards
+1. Read `.github/copilot-instructions.md` for development standards
 2. Check `TASK.md` for current sprint work
-3. Reference `.claude/INITIAL.md` for technical specifications
+3. Reference `.github/INITIAL.md` for technical specifications
 4. Ensure AWS credentials configured (`AWS_PROFILE=NNGC`)
 
 ### 2. Feature Development Process
@@ -205,7 +205,7 @@ icda-prototype/
 ---
 
 **Reference Files:**
-- Technical Specifications: `.claude/INITIAL.md`
-- Development Standards: `.claude/CLAUDE.md`
-- Infrastructure Setup: `.claude/INFRASTRUCTURE.md`
+- Technical Specifications: `.github/INITIAL.md`
+- Development Standards: `.github/copilot-instructions.md`
+- Infrastructure Setup: `.github/INFRASTRUCTURE.md`
 - Current Tasks: `TASK.md`
