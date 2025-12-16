@@ -197,11 +197,7 @@ async def lifespan(app: FastAPI):
     _db = CustomerDB(BASE_DIR / "customer_data.json")
     print(f"Customer database: {len(_db.customers)} customers loaded")
 
-    _nova = NovaClient(cfg.aws_region, cfg.nova_model, _db)
-
     _sessions = SessionManager(_cache)
-
-    _router = Router(_cache, _vector_index, _db, _nova, _sessions)
 
     # Initialize address verification
     print("\nInitializing address verification...")
@@ -233,7 +229,7 @@ async def lifespan(app: FastAPI):
     configure_router(_address_pipeline, _orchestrator)
     print("  Address verification: ready")
 
-    # Initialize knowledge base
+    # Initialize knowledge base BEFORE NovaClient so it can use RAG
     print("\nInitializing knowledge base...")
     opensearch_client = _vector_index.client if _vector_index.available else None
     _knowledge = KnowledgeManager(_embedder, opensearch_client)
@@ -271,6 +267,29 @@ async def lifespan(app: FastAPI):
 
     _knowledge_watcher = KnowledgeWatcher(KNOWLEDGE_DIR, index_file_callback)
     _knowledge_watcher.start()
+
+    # Initialize NovaClient with full 8-agent pipeline including knowledge RAG
+    print("\nInitializing AI query pipeline...")
+    _nova = NovaClient(
+        region=cfg.aws_region,
+        model=cfg.nova_model,
+        db=_db,
+        vector_index=_vector_index,
+        knowledge=_knowledge,  # Pass knowledge manager for RAG
+        address_orchestrator=_orchestrator,
+        session_store=_sessions,
+        use_orchestrator=True,  # Enable 8-agent pipeline
+    )
+    if _nova.available:
+        if _nova.orchestrator:
+            print(f"  Nova AI: enabled with 8-agent orchestrator")
+            print(f"    - KnowledgeAgent: {'enabled' if _nova.orchestrator._knowledge_agent.available else 'disabled'}")
+        else:
+            print(f"  Nova AI: enabled (simple mode)")
+    else:
+        print("  Nova AI: disabled (no AWS credentials)")
+
+    _router = Router(_cache, _vector_index, _db, _nova, _sessions)
 
     # Initialize Gemini Enforcer (optional, graceful degradation if no API key)
     print("\nInitializing Gemini Enforcer...")

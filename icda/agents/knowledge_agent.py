@@ -51,18 +51,10 @@ class KnowledgeAgent:
         Returns:
             KnowledgeContext with retrieved chunks.
         """
-        # Skip if knowledge domain not relevant
-        if QueryDomain.KNOWLEDGE not in intent.domains and not self._should_augment(intent):
-            return KnowledgeContext(
-                relevant_chunks=[],
-                total_chunks_found=0,
-                categories_searched=[],
-                tags_matched=[],
-                rag_confidence=0.0,
-            )
-
-        # Skip if knowledge base not available
+        # Always try to retrieve knowledge - let the search determine relevance
+        # Skip only if knowledge base not available
         if not self._available:
+            logger.debug("KnowledgeAgent: Knowledge base not available")
             return KnowledgeContext(
                 relevant_chunks=[],
                 total_chunks_found=0,
@@ -73,6 +65,7 @@ class KnowledgeAgent:
 
         # Determine categories to search
         categories = self._determine_categories(intent, parsed)
+        logger.info(f"KnowledgeAgent: Searching categories {categories} for query: {query[:50]}...")
 
         # Search knowledge base
         chunks, total, tags = await self._search_knowledge(
@@ -81,6 +74,8 @@ class KnowledgeAgent:
 
         # Calculate RAG confidence
         confidence = self._calculate_confidence(chunks, intent)
+
+        logger.info(f"KnowledgeAgent: Found {len(chunks)} chunks, confidence={confidence:.2f}")
 
         return KnowledgeContext(
             relevant_chunks=chunks,
@@ -122,11 +117,13 @@ class KnowledgeAgent:
             parsed: Parsed query.
 
         Returns:
-            List of category names.
+            List of category names. Includes None to search ALL categories.
         """
-        categories = []
+        # Always search without category filter first (None = all categories)
+        # This ensures we find relevant knowledge regardless of how it was categorized
+        categories = [None]  # None means search all categories
 
-        # Map intents to likely categories
+        # Also add specific categories for intent-based filtering
         from icda.classifier import QueryIntent
 
         intent_categories = {
@@ -141,9 +138,8 @@ class KnowledgeAgent:
         if intent.primary_intent in intent_categories:
             categories.extend(intent_categories[intent.primary_intent])
 
-        # Add general category if nothing specific
-        if not categories:
-            categories = ["general"]
+        # Always include general category
+        categories.append("general")
 
         return list(dict.fromkeys(categories))  # Remove duplicates
 
@@ -176,17 +172,19 @@ class KnowledgeAgent:
                 result = await self._execute_search(query, category, limit)
 
                 if result.get("success"):
-                    for chunk in result.get("results", []):
+                    # KnowledgeManager returns "hits" not "results"
+                    hits = result.get("hits", result.get("results", []))
+                    for chunk in hits:
                         chunks.append({
                             "text": chunk.get("text", ""),
-                            "source": chunk.get("source", ""),
-                            "category": category,
+                            "source": chunk.get("filename", chunk.get("source", "")),
+                            "category": chunk.get("category", category),
                             "score": chunk.get("score", 0),
                         })
                         if chunk.get("tags"):
                             all_tags.update(chunk["tags"])
 
-                    total += result.get("total", 0)
+                    total += result.get("total", len(hits))
 
             # Sort by score and limit
             chunks.sort(key=lambda x: x.get("score", 0), reverse=True)
