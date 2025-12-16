@@ -1,15 +1,23 @@
 # ICDA - Intelligent Customer Data Access
 # Multi-stage build for optimized production image
 
-# Build stage for frontend
+# ============================================
+# Stage 1: Build frontend
+# ============================================
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
+
+# Copy package files first for layer caching
 COPY frontend/package*.json ./
 RUN npm ci --silent
+
+# Copy source and build
 COPY frontend/ ./
 RUN npm run build
 
-# Production stage
+# ============================================
+# Stage 2: Production image
+# ============================================
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -19,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Python requirements and install
+# Copy Python requirements and install (layer caching)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -29,7 +37,7 @@ COPY customer_data.json .
 COPY icda/ ./icda/
 COPY templates/ ./templates/
 
-# Copy built frontend to serve as static files
+# Copy built frontend from builder stage
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
 # Environment variables (defaults)

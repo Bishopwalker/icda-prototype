@@ -86,6 +86,7 @@ export const GuardrailsPanel: React.FC<GuardrailsPanelProps> = ({
           color="error"
           onClick={onDisableAll}
           disabled={allDisabled}
+          aria-label="Disable all guardrails"
           sx={{ flex: 1, textTransform: 'none' }}
         >
           Disable All
@@ -96,6 +97,7 @@ export const GuardrailsPanel: React.FC<GuardrailsPanelProps> = ({
           color="success"
           onClick={onEnableAll}
           disabled={allEnabled}
+          aria-label="Enable all guardrails"
           sx={{ flex: 1, textTransform: 'none' }}
         >
           Enable All
@@ -112,6 +114,7 @@ export const GuardrailsPanel: React.FC<GuardrailsPanelProps> = ({
                 value={config.key}
                 selected={isActive}
                 onChange={() => onToggle(config.key)}
+                aria-label={`Toggle ${config.label} guardrail`}
                 sx={{
                   justifyContent: 'flex-start',
                   gap: 1.5,

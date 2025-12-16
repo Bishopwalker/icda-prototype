@@ -25,6 +25,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
   return (
     <Box
+      role="article"
+      aria-label={`${isUser ? 'User' : 'Bot'} message`}
       sx={{
         display: 'flex',
         flexDirection: isUser ? 'row-reverse' : 'row',
@@ -47,6 +49,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
     >
       {/* Avatar */}
       <Avatar
+        aria-label={isUser ? 'User Avatar' : 'Bot Avatar'}
         sx={{
           width: 36,
           height: 36,
@@ -168,6 +171,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
                 icon={<CacheIcon sx={{ fontSize: 12 }} />}
                 label="Cached"
                 size="small"
+                aria-label="Cached"
                 sx={{
                   fontSize: '0.65rem',
                   height: 22,
@@ -185,6 +189,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
               <Chip
                 label={message.metadata.tool}
                 size="small"
+                aria-label={`Tool: ${message.metadata.tool}`}
                 sx={{
                   fontSize: '0.65rem',
                   height: 22,
@@ -197,6 +202,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
             {message.metadata.latency_ms !== undefined && (
               <Box
+                aria-label={`Latency: ${message.metadata.latency_ms} milliseconds`}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',

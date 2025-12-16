@@ -4,7 +4,7 @@ import { alpha } from '@mui/material/styles';
 import {
   Refresh as RefreshIcon, Storage as StorageIcon, Cloud as CloudIcon,
   DeleteSweep as ClearCacheIcon, AddComment as NewChatIcon, Forum as SessionIcon,
-  Psychology as AIIcon, LocalPostOffice as MailIcon,
+  Psychology as AIIcon, LocalPostOffice as MailIcon, AdminPanelSettings as AdminIcon,
 } from '@mui/icons-material';
 import { colors, borderRadius, transitions } from '../theme';
 import type { HealthStatus, CacheStats } from '../types';
@@ -32,6 +32,8 @@ const StatusChip: React.FC<StatusChipProps> = ({ active, icon, activeLabel, inac
     icon={icon}
     label={active ? activeLabel : inactiveLabel}
     size="small"
+    role="status"
+    aria-label={active ? activeLabel : inactiveLabel}
     sx={{
       backgroundColor: alpha(active ? activeColor : colors.neutral.main, 0.15),
       color: active ? activeColor : colors.neutral.light,
@@ -59,6 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <Box
+      component="header"
       sx={{
         py: 2,
         px: 3,
@@ -76,6 +79,8 @@ export const Header: React.FC<HeaderProps> = ({
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         {/* ICDA Logo */}
         <Box
+          role="img"
+          aria-label="ICDA Logo"
           sx={{
             width: 44,
             height: 44,
@@ -93,12 +98,10 @@ export const Header: React.FC<HeaderProps> = ({
         <Box>
           <Typography
             variant="h5"
+            component="h1"
             sx={{
               fontWeight: 700,
-              background: `linear-gradient(135deg, ${colors.text.primary} 0%, ${colors.accent.light} 100%)`,
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
+              color: 'text.primary',
               display: 'flex',
               alignItems: 'center',
               gap: 1,
@@ -109,6 +112,7 @@ export const Header: React.FC<HeaderProps> = ({
               icon={<MailIcon sx={{ fontSize: 14 }} />}
               label="USPS"
               size="small"
+              aria-label="USPS Chip"
               sx={{
                 height: 22,
                 fontSize: '0.65rem',
@@ -147,6 +151,7 @@ export const Header: React.FC<HeaderProps> = ({
         <Tooltip title="Start New Conversation">
           <IconButton
             onClick={onNewSession}
+            aria-label="Start New Conversation"
             size="small"
             sx={{
               color: colors.primary.light,
@@ -176,6 +181,8 @@ export const Header: React.FC<HeaderProps> = ({
           icon={<StorageIcon sx={{ fontSize: 16 }} />}
           label={`${cacheStats?.keys ?? 0} cached`}
           size="small"
+          aria-live="polite"
+          aria-label={`${cacheStats?.keys ?? 0} items cached`}
           sx={{
             backgroundColor: alpha(colors.info.main, 0.15),
             color: colors.info.light,
@@ -192,6 +199,7 @@ export const Header: React.FC<HeaderProps> = ({
             <IconButton
               onClick={handleClearCache}
               disabled={clearing || loading || (cacheStats?.keys ?? 0) === 0}
+              aria-label="Clear Redis Cache"
               size="small"
               sx={{
                 color: colors.error.light,
@@ -213,6 +221,9 @@ export const Header: React.FC<HeaderProps> = ({
                 sx={{
                   fontSize: 20,
                   animation: clearing ? 'spin 1s linear infinite' : 'none',
+                  '@media (prefers-reduced-motion: reduce)': {
+                    animation: 'none',
+                  },
                 }}
               />
             </IconButton>
@@ -225,6 +236,7 @@ export const Header: React.FC<HeaderProps> = ({
             label={`${health.customers.toLocaleString()} customers`}
             size="small"
             variant="outlined"
+            aria-label={`${health.customers.toLocaleString()} customers`}
             sx={{
               borderColor: alpha(colors.text.primary, 0.2),
               color: 'text.secondary',
@@ -238,6 +250,7 @@ export const Header: React.FC<HeaderProps> = ({
             <IconButton
               onClick={onRefresh}
               disabled={loading}
+              aria-label="Refresh status"
               size="small"
               sx={{
                 color: 'text.secondary',
@@ -256,10 +269,34 @@ export const Header: React.FC<HeaderProps> = ({
                 sx={{
                   fontSize: 20,
                   animation: loading ? 'spin 1s linear infinite' : 'none',
+                  '@media (prefers-reduced-motion: reduce)': {
+                    animation: 'none',
+                  },
                 }}
               />
             </IconButton>
           </span>
+        </Tooltip>
+
+        {/* Admin Panel Button */}
+        <Tooltip title="Admin Panel">
+          <IconButton
+            component="a"
+            href="/admin"
+            aria-label="Admin Panel"
+            size="small"
+            sx={{
+              color: colors.warning.light,
+              backgroundColor: alpha(colors.warning.main, 0.1),
+              transition: transitions.fast,
+              '&:hover': {
+                backgroundColor: alpha(colors.warning.main, 0.2),
+                transform: 'scale(1.05)',
+              },
+            }}
+          >
+            <AdminIcon sx={{ fontSize: 20 }} />
+          </IconButton>
         </Tooltip>
       </Box>
     </Box>

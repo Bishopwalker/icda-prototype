@@ -33,6 +33,9 @@ from icda.session import SessionManager
 from icda.knowledge import KnowledgeManager
 from icda.knowledge_watcher import KnowledgeWatcher
 
+# Gemini Enforcer imports
+from icda.gemini import GeminiEnforcer
+
 # Address verification imports
 from icda.address_index import AddressIndex
 from icda.address_completer import NovaAddressCompleter
@@ -68,6 +71,9 @@ _address_pipeline: AddressPipeline = None
 _zip_database: ZipDatabase = None
 _address_vector_index: AddressVectorIndex = None
 _orchestrator: AddressAgentOrchestrator = None
+
+# Gemini Enforcer global
+_enforcer: GeminiEnforcer = None
 
 
 def _extract_tags_from_content(content: str, filepath: Path) -> list[str]:
@@ -164,19 +170,29 @@ async def lifespan(app: FastAPI):
     global _cache, _embedder, _vector_index, _db, _nova, _sessions, _router, _knowledge, _knowledge_watcher
     global _address_index, _address_completer, _address_pipeline
     global _zip_database, _address_vector_index, _orchestrator
+    global _enforcer
 
     print("\n" + "="*50)
     print("  ICDA Startup")
     print("="*50 + "\n")
 
-    # Startup
+    # Startup - Redis is REQUIRED
     _cache = RedisCache(cfg.cache_ttl)
     await _cache.connect(cfg.redis_url)
+    if not _cache.available:
+        print("\n[FATAL] Redis is REQUIRED but not available!")
+        print("        Start Redis with: docker-compose up -d redis")
+        raise RuntimeError("Redis is required for ICDA")
 
     _embedder = EmbeddingClient(cfg.aws_region, cfg.titan_embed_model, cfg.embed_dimensions)
 
+    # OpenSearch is REQUIRED
     _vector_index = VectorIndex(_embedder, cfg.opensearch_index)
     await _vector_index.connect(cfg.opensearch_host, cfg.aws_region)
+    if not _vector_index.available:
+        print("\n[FATAL] OpenSearch is REQUIRED but not available!")
+        print("        Start OpenSearch with: docker-compose up -d opensearch")
+        raise RuntimeError("OpenSearch is required for ICDA")
 
     _db = CustomerDB(BASE_DIR / "customer_data.json")
     print(f"Customer database: {len(_db.customers)} customers loaded")
@@ -255,6 +271,17 @@ async def lifespan(app: FastAPI):
 
     _knowledge_watcher = KnowledgeWatcher(KNOWLEDGE_DIR, index_file_callback)
     _knowledge_watcher.start()
+
+    # Initialize Gemini Enforcer (optional, graceful degradation if no API key)
+    print("\nInitializing Gemini Enforcer...")
+    _enforcer = GeminiEnforcer(cfg)
+    if _enforcer.available:
+        print(f"  Enforcer: enabled (model: {cfg.gemini_model})")
+        print(f"  - L1 Chunk Gate: threshold {cfg.gemini_chunk_threshold}")
+        print(f"  - L2 Index Validation: every {cfg.gemini_validation_interval}h")
+        print(f"  - L3 Query Review: {int(cfg.gemini_query_sample_rate * 100)}% sample")
+    else:
+        print("  Enforcer: disabled (no GEMINI_API_KEY)")
 
     # Print mode summary
     mode = "FULL" if _nova.available and _embedder.available else "LITE"
@@ -519,6 +546,588 @@ async def reindex_knowledge_documents(force: bool = False):
 
     result = await auto_index_knowledge_documents(_knowledge)
     return {"success": True, **result}
+
+
+# ==================== Admin API ====================
+
+class AdminChunkUpdate(BaseModel):
+    """Model for updating chunk metadata."""
+    tags: list[str] | None = None
+    category: str | None = None
+    quality_score: float | None = None
+
+
+class AdminSearchTest(BaseModel):
+    """Model for testing search queries."""
+    query: str
+    limit: int = 10
+    index: str | None = None
+    filters: dict | None = None
+    explain: bool = False
+
+
+class AdminSavedQuery(BaseModel):
+    """Model for saving test queries."""
+    name: str
+    query: str
+    index: str | None = None
+    filters: dict | None = None
+    notes: str | None = None
+
+
+# In-memory store for saved queries (would be Redis in production)
+_saved_queries: dict = {}
+_saved_query_counter: int = 0
+
+
+@app.get("/api/admin/chunks")
+async def admin_list_chunks(
+    offset: int = 0,
+    limit: int = 50,
+    category: str | None = None,
+    min_quality: float | None = None,
+    max_quality: float | None = None,
+    sort_by: str = "created_at",
+    sort_order: str = "desc"
+):
+    """List all chunks with pagination and filtering."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+    if not _knowledge or not _knowledge.available:
+        return {"success": False, "chunks": [], "error": "Knowledge base not available"}
+
+    all_docs = await _knowledge.list_documents(category=category, limit=1000)
+    chunks = []
+
+    for doc in all_docs:
+        doc_chunks = await _knowledge.get_document_chunks(doc.get("doc_id", ""))
+        for chunk in doc_chunks:
+            quality = chunk.get("quality_score", 1.0)
+            if min_quality and quality < min_quality:
+                continue
+            if max_quality and quality > max_quality:
+                continue
+            chunks.append({
+                "chunk_id": chunk.get("chunk_id", ""),
+                "doc_id": doc.get("doc_id", ""),
+                "filename": doc.get("filename", "unknown"),
+                "content": chunk.get("content", "")[:500],
+                "content_length": len(chunk.get("content", "")),
+                "category": doc.get("category", "general"),
+                "tags": doc.get("tags", []),
+                "quality_score": quality,
+                "created_at": chunk.get("created_at", ""),
+            })
+
+    if sort_by == "quality_score":
+        chunks.sort(key=lambda x: x.get("quality_score", 0), reverse=(sort_order == "desc"))
+    elif sort_by == "content_length":
+        chunks.sort(key=lambda x: x.get("content_length", 0), reverse=(sort_order == "desc"))
+    else:
+        chunks.sort(key=lambda x: x.get("created_at", ""), reverse=(sort_order == "desc"))
+
+    total = len(chunks)
+    paginated = chunks[offset:offset + limit]
+
+    return {
+        "success": True,
+        "chunks": paginated,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "has_more": offset + limit < total
+    }
+
+
+@app.get("/api/admin/chunks/{chunk_id}")
+async def admin_get_chunk(chunk_id: str):
+    """Get detailed information about a specific chunk."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+    if not _knowledge or not _knowledge.available:
+        return {"success": False, "error": "Knowledge base not available"}
+
+    all_docs = await _knowledge.list_documents(limit=1000)
+    for doc in all_docs:
+        doc_chunks = await _knowledge.get_document_chunks(doc.get("doc_id", ""))
+        for chunk in doc_chunks:
+            if chunk.get("chunk_id") == chunk_id:
+                return {
+                    "success": True,
+                    "chunk": {
+                        "chunk_id": chunk_id,
+                        "doc_id": doc.get("doc_id", ""),
+                        "filename": doc.get("filename", "unknown"),
+                        "content": chunk.get("content", ""),
+                        "content_length": len(chunk.get("content", "")),
+                        "category": doc.get("category", "general"),
+                        "tags": doc.get("tags", []),
+                        "quality_score": chunk.get("quality_score", 1.0),
+                        "embedding_preview": chunk.get("embedding", [])[:10] if chunk.get("embedding") else None,
+                        "embedding_dimensions": len(chunk.get("embedding", [])) if chunk.get("embedding") else 0,
+                        "created_at": chunk.get("created_at", ""),
+                        "metadata": chunk.get("metadata", {})
+                    }
+                }
+
+    return {"success": False, "error": "Chunk not found"}
+
+
+@app.patch("/api/admin/chunks/{chunk_id}")
+async def admin_update_chunk(chunk_id: str, update: AdminChunkUpdate):
+    """Update chunk metadata (tags, category, quality_score)."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+    if not _knowledge or not _knowledge.available:
+        return {"success": False, "error": "Knowledge base not available"}
+
+    return {"success": False, "error": "Chunk updates not yet implemented"}
+
+
+@app.delete("/api/admin/chunks/{chunk_id}")
+async def admin_delete_chunk(chunk_id: str):
+    """Delete a specific chunk."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+    if not _knowledge or not _knowledge.available:
+        return {"success": False, "error": "Knowledge base not available"}
+
+    return {"success": False, "error": "Individual chunk deletion not yet implemented"}
+
+
+@app.post("/api/admin/chunks/{chunk_id}/reembed")
+async def admin_reembed_chunk(chunk_id: str):
+    """Regenerate embedding for a specific chunk."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+    if not _knowledge or not _knowledge.available:
+        return {"success": False, "error": "Knowledge base not available"}
+    if not _embedder or not _embedder.available:
+        return {"success": False, "error": "Embedding service not available"}
+
+    return {"success": False, "error": "Re-embedding not yet implemented"}
+
+
+@app.get("/api/admin/chunks/embeddings/visualization")
+async def admin_embedding_visualization(sample_size: int = 100):
+    """Get 2D projection of chunk embeddings for visualization (t-SNE/UMAP style)."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+    if not _knowledge or not _knowledge.available:
+        return {"success": False, "points": [], "error": "Knowledge base not available"}
+
+    return {
+        "success": True,
+        "points": [],
+        "message": "Embedding visualization requires sklearn/umap - not yet implemented"
+    }
+
+
+@app.get("/api/admin/index/stats")
+async def admin_index_stats():
+    """Get detailed statistics for all indexes."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+
+    stats = {
+        "knowledge": {},
+        "customers": {},
+        "addresses": {},
+        "services": {},
+        "enforcer": {}
+    }
+
+    if _knowledge and _knowledge.available:
+        kb_stats = await _knowledge.get_stats()
+        stats["knowledge"] = kb_stats
+
+    if _vector_index and _vector_index.available:
+        customer_count = await _vector_index.customer_count()
+        stats["customers"] = {
+            "indexed": customer_count,
+            "index_name": _vector_index.customer_index
+        }
+
+    if _address_vector_index:
+        stats["addresses"] = {
+            "available": True,
+            "total_addresses": _address_index.total_addresses if _address_index else 0
+        }
+
+    stats["services"] = {
+        "redis": _cache.available if _cache else False,
+        "opensearch": _vector_index.available if _vector_index else False,
+        "embeddings": _embedder.available if _embedder else False,
+        "nova_ai": _nova.available if _nova else False
+    }
+
+    if _enforcer:
+        stats["enforcer"] = _enforcer.get_metrics()
+
+    return {"success": True, "stats": stats}
+
+
+@app.get("/api/admin/index/health")
+async def admin_index_health():
+    """Get health status of all indexes."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+
+    health = {
+        "overall": "healthy",
+        "indexes": {},
+        "issues": []
+    }
+
+    if _knowledge and _knowledge.available:
+        kb_stats = await _knowledge.get_stats()
+        kb_health = "healthy"
+        if kb_stats.get("total_chunks", 0) == 0:
+            kb_health = "empty"
+            health["issues"].append("Knowledge base has no chunks indexed")
+        health["indexes"]["knowledge"] = {
+            "status": kb_health,
+            "chunks": kb_stats.get("total_chunks", 0),
+            "documents": kb_stats.get("unique_documents", 0)
+        }
+    else:
+        health["indexes"]["knowledge"] = {"status": "unavailable"}
+        health["issues"].append("Knowledge base not available")
+
+    if _vector_index and _vector_index.available:
+        customer_count = await _vector_index.customer_count()
+        health["indexes"]["customers"] = {
+            "status": "healthy" if customer_count > 0 else "empty",
+            "count": customer_count
+        }
+    else:
+        health["indexes"]["customers"] = {"status": "unavailable"}
+        health["issues"].append("Customer index not available")
+
+    if len(health["issues"]) > 0:
+        health["overall"] = "degraded"
+
+    return {"success": True, "health": health}
+
+
+@app.post("/api/admin/index/reindex")
+async def admin_trigger_reindex(index_name: str = "all"):
+    """Trigger re-indexing of specified index."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+
+    results = {}
+
+    if index_name in ("all", "knowledge"):
+        if _knowledge and _knowledge.available:
+            result = await auto_index_knowledge_documents(_knowledge)
+            results["knowledge"] = result
+        else:
+            results["knowledge"] = {"error": "Not available"}
+
+    if index_name in ("all", "customers"):
+        if _vector_index and _vector_index.available and _db:
+            count = await _vector_index.index_customers(_db.customers)
+            results["customers"] = {"indexed": count}
+        else:
+            results["customers"] = {"error": "Not available"}
+
+    return {"success": True, "results": results}
+
+
+@app.delete("/api/admin/index/{index_name}")
+async def admin_clear_index(index_name: str):
+    """Clear all data from specified index."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+
+    if index_name == "knowledge":
+        if _knowledge and _knowledge.available:
+            docs = await _knowledge.list_documents(limit=1000)
+            deleted = 0
+            for doc in docs:
+                result = await _knowledge.delete_document(doc.get("doc_id", ""))
+                deleted += result.get("deleted", 0)
+            return {"success": True, "deleted": deleted}
+        return {"success": False, "error": "Knowledge base not available"}
+
+    return {"success": False, "error": f"Unknown index: {index_name}"}
+
+
+@app.get("/api/admin/index/export")
+async def admin_export_stats():
+    """Export comprehensive index statistics for reporting."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+
+    from datetime import datetime
+
+    stats = await admin_index_stats()
+    health = await admin_index_health()
+
+    return {
+        "success": True,
+        "export": {
+            "timestamp": datetime.utcnow().isoformat(),
+            "stats": stats.get("stats", {}),
+            "health": health.get("health", {}),
+            "config": {
+                "opensearch_host": cfg.opensearch_host,
+                "redis_url": bool(cfg.redis_url),
+                "federation_enabled": cfg.enable_federation,
+                "enforcer_enabled": cfg.enable_gemini_enforcer,
+                "admin_enabled": cfg.admin_enabled
+            }
+        }
+    }
+
+
+@app.post("/api/admin/search/test")
+async def admin_test_search(req: AdminSearchTest):
+    """Test a search query with debug information."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+
+    import time
+    start = time.time()
+
+    results = []
+    debug_info = {
+        "query": req.query,
+        "index": req.index or "knowledge",
+        "filters": req.filters,
+        "explain": req.explain
+    }
+
+    if (req.index or "knowledge") == "knowledge":
+        if _knowledge and _knowledge.available:
+            search_result = await _knowledge.search(
+                query=req.query,
+                limit=req.limit,
+                tags=req.filters.get("tags") if req.filters else None,
+                category=req.filters.get("category") if req.filters else None
+            )
+            results = search_result.get("hits", [])
+            debug_info["backend"] = search_result.get("backend", "unknown")
+            debug_info["search_type"] = search_result.get("search_type", "unknown")
+    elif req.index == "customers":
+        if _vector_index and _vector_index.available:
+            search_result = await _vector_index.search_customers_semantic(
+                req.query,
+                req.limit,
+                req.filters
+            )
+            results = search_result.get("hits", [])
+
+    elapsed = time.time() - start
+    debug_info["elapsed_ms"] = round(elapsed * 1000, 2)
+    debug_info["result_count"] = len(results)
+
+    return {
+        "success": True,
+        "results": results,
+        "debug": debug_info if req.explain else None
+    }
+
+
+@app.post("/api/admin/search/saved")
+async def admin_save_query(req: AdminSavedQuery):
+    """Save a test query for later use."""
+    global _saved_query_counter
+
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+
+    _saved_query_counter += 1
+    query_id = f"sq_{_saved_query_counter}"
+
+    from datetime import datetime
+    _saved_queries[query_id] = {
+        "id": query_id,
+        "name": req.name,
+        "query": req.query,
+        "index": req.index,
+        "filters": req.filters,
+        "notes": req.notes,
+        "created_at": datetime.utcnow().isoformat()
+    }
+
+    return {"success": True, "query_id": query_id}
+
+
+@app.get("/api/admin/search/saved")
+async def admin_list_saved_queries():
+    """List all saved test queries."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+
+    return {
+        "success": True,
+        "queries": list(_saved_queries.values()),
+        "count": len(_saved_queries)
+    }
+
+
+@app.delete("/api/admin/search/saved/{query_id}")
+async def admin_delete_saved_query(query_id: str):
+    """Delete a saved test query."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+
+    if query_id in _saved_queries:
+        del _saved_queries[query_id]
+        return {"success": True, "deleted": query_id}
+
+    return {"success": False, "error": "Query not found"}
+
+
+@app.post("/api/admin/search/saved/{query_id}/run")
+async def admin_run_saved_query(query_id: str):
+    """Run a saved test query."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+
+    if query_id not in _saved_queries:
+        return {"success": False, "error": "Query not found"}
+
+    saved = _saved_queries[query_id]
+    return await admin_test_search(AdminSearchTest(
+        query=saved["query"],
+        index=saved.get("index"),
+        filters=saved.get("filters"),
+        explain=True
+    ))
+
+
+@app.get("/api/admin/enforcer/metrics")
+async def admin_enforcer_metrics():
+    """Get Gemini Enforcer pipeline metrics."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+
+    if not _enforcer:
+        return {
+            "success": True,
+            "available": False,
+            "metrics": None,
+            "message": "Enforcer not initialized"
+        }
+
+    return {
+        "success": True,
+        "available": _enforcer.available,
+        "metrics": _enforcer.get_metrics(),
+        "config": {
+            "model": cfg.gemini_model,
+            "chunk_threshold": cfg.gemini_chunk_threshold,
+            "query_sample_rate": cfg.gemini_query_sample_rate,
+            "validation_interval_hours": cfg.gemini_validation_interval
+        }
+    }
+
+
+@app.get("/api/admin/chunks/quality")
+async def admin_chunks_quality(threshold: float = 0.6, limit: int = 50):
+    """Get chunks below quality threshold for review."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+    if not _knowledge or not _knowledge.available:
+        return {"success": False, "chunks": [], "error": "Knowledge base not available"}
+
+    all_docs = await _knowledge.list_documents(limit=1000)
+    low_quality = []
+
+    for doc in all_docs:
+        doc_chunks = await _knowledge.get_document_chunks(doc.get("doc_id", ""))
+        for chunk in doc_chunks:
+            quality = chunk.get("quality_score", 1.0)
+            if quality < threshold:
+                low_quality.append({
+                    "chunk_id": chunk.get("chunk_id", ""),
+                    "doc_id": doc.get("doc_id", ""),
+                    "filename": doc.get("filename", "unknown"),
+                    "content_preview": chunk.get("content", "")[:200],
+                    "quality_score": quality,
+                    "category": doc.get("category", "general"),
+                })
+
+    low_quality.sort(key=lambda x: x.get("quality_score", 0))
+    return {
+        "success": True,
+        "chunks": low_quality[:limit],
+        "total_below_threshold": len(low_quality),
+        "threshold": threshold
+    }
+
+
+@app.post("/api/admin/enforcer/evaluate-chunk")
+async def admin_evaluate_chunk(chunk_id: str, content: str, source: str = "manual"):
+    """Manually trigger L1 chunk quality evaluation."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+
+    if not _enforcer or not _enforcer.available:
+        return {"success": False, "error": "Enforcer not available"}
+
+    result = await _enforcer.evaluate_chunk(
+        chunk_id=chunk_id,
+        content=content,
+        source=source,
+        content_type="text"
+    )
+
+    return {
+        "success": True,
+        "result": {
+            "passed": result.passed,
+            "overall_score": result.overall_score,
+            "coherence": result.quality.coherence,
+            "completeness": result.quality.completeness,
+            "relevance": result.quality.relevance,
+            "issues": result.quality.issues,
+            "suggestions": result.quality.suggestions
+        }
+    }
+
+
+@app.post("/api/admin/enforcer/validate-index")
+async def admin_validate_index():
+    """Manually trigger L2 index validation."""
+    if not cfg.admin_enabled:
+        return {"success": False, "error": "Admin API disabled"}
+
+    if not _enforcer or not _enforcer.available:
+        return {"success": False, "error": "Enforcer not available"}
+
+    if not _knowledge or not _knowledge.available:
+        return {"success": False, "error": "Knowledge base not available"}
+
+    all_docs = await _knowledge.list_documents(limit=500)
+    chunks = []
+    for doc in all_docs:
+        doc_chunks = await _knowledge.get_document_chunks(doc.get("doc_id", ""))
+        for chunk in doc_chunks:
+            chunks.append({
+                "chunk_id": chunk.get("chunk_id", ""),
+                "content": chunk.get("content", ""),
+                "source": doc.get("filename", "unknown"),
+                "category": doc.get("category", "general")
+            })
+
+    report = await _enforcer.validate_index(chunks)
+
+    return {
+        "success": True,
+        "report": {
+            "health_score": report.health_score,
+            "total_chunks": report.total_chunks,
+            "sampled_chunks": report.sampled_chunks,
+            "duplicate_groups": len(report.duplicate_groups),
+            "stale_chunks": len(report.stale_chunks),
+            "coverage_gaps": report.coverage_gaps,
+            "recommendations": report.recommendations
+        }
+    }
 
 
 # ==================== Frontend ====================

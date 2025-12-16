@@ -72,9 +72,11 @@ if %errorlevel%==0 (
 )
 
 REM Activate virtual environment if it exists
-if exist "venv\Scripts\activate.bat" (
-    echo [INFO] Activating Python virtual environment...
-    call venv\Scripts\activate.bat
+if exist ".venv\Scripts\activate.bat" (
+    echo [INFO] Activating Python 3.11 virtual environment...
+    call .venv\Scripts\activate.bat
+) else (
+    echo [WARN] No .venv found! Run setup-local.bat first.
 )
 
 echo.

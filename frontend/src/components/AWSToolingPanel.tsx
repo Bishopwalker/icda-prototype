@@ -48,6 +48,8 @@ export const AWSToolingPanel: React.FC<AWSToolingPanelProps> = ({ health, loadin
                   icon={<StatusIcon status={status} />}
                   label={status}
                   size="small"
+                  role="status"
+                  aria-label={`${name} status: ${status}`}
                   sx={{
                     backgroundColor: getStatusBgColor(status),
                     color: getStatusColor(status),

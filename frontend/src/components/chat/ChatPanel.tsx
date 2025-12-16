@@ -38,6 +38,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ messages, loading, onQuick
     >
       <Box
         ref={scrollRef}
+        role="log"
+        aria-live="polite"
+        aria-atomic="false"
         sx={{
           flex: 1,
           minHeight: 0,
@@ -111,6 +114,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ messages, loading, onQuick
         {/* Loading Indicator */}
         {loading && (
           <Box
+            role="status"
+            aria-label="ICDA is thinking"
             sx={{
               display: 'flex',
               alignItems: 'center',

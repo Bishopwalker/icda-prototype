@@ -137,6 +137,8 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onSelectAction, visi
             >
               <Paper
                 elevation={0}
+                role="button"
+                aria-label={action.label}
                 onClick={() => onSelectAction(action.query)}
                 sx={{
                   p: 2,

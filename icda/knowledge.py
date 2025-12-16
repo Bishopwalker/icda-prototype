@@ -709,6 +709,41 @@ class KnowledgeManager:
         except Exception as e:
             return {"deleted": 0, "error": str(e)}
 
+    async def get_document_chunks(self, doc_id: str) -> list[dict]:
+        """Get all chunks for a specific document."""
+        if not self.available:
+            return []
+
+        if not self.use_opensearch:
+            return [c for c in self._memory_store.chunks if c["doc_id"] == doc_id]
+
+        try:
+            resp = await self.client.search(
+                index=self.INDEX_NAME,
+                body={
+                    "size": 1000,
+                    "query": {"term": {"doc_id": doc_id}},
+                    "sort": [{"chunk_index": "asc"}],
+                    "_source": ["chunk_id", "chunk_index", "text", "tags", "category", "indexed_at"]
+                }
+            )
+            chunks = []
+            for hit in resp["hits"]["hits"]:
+                src = hit["_source"]
+                chunks.append({
+                    "chunk_id": src.get("chunk_id", ""),
+                    "chunk_index": src.get("chunk_index", 0),
+                    "content": src.get("text", ""),
+                    "tags": src.get("tags", []),
+                    "category": src.get("category", "general"),
+                    "created_at": src.get("indexed_at", ""),
+                    "quality_score": src.get("quality_score", 1.0)
+                })
+            return chunks
+        except Exception as e:
+            print(f"Error getting document chunks: {e}")
+            return []
+
     async def get_stats(self) -> dict:
         """Get knowledge base statistics."""
         if not self.available:

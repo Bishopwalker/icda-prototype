@@ -125,6 +125,7 @@ export const WelcomePanel: React.FC<WelcomePanelProps> = ({ visible }) => {
       >
         {/* AI Avatar/Logo */}
         <Box
+          aria-label="AI Avatar"
           sx={{
             width: 100,
             height: 100,
@@ -155,6 +156,7 @@ export const WelcomePanel: React.FC<WelcomePanelProps> = ({ visible }) => {
             icon={<MailIcon sx={{ fontSize: 16 }} />}
             label="USPS"
             size="small"
+            aria-label="USPS Brand Chip"
             sx={{
               backgroundColor: alpha(colors.usps.blue, 0.2),
               color: colors.usps.lightBlue,
@@ -165,6 +167,7 @@ export const WelcomePanel: React.FC<WelcomePanelProps> = ({ visible }) => {
             icon={<VerifiedIcon sx={{ fontSize: 16 }} />}
             label={<>Powered by <ECSStyled /></>}
             size="small"
+            aria-label="Powered by ECS Brand Chip"
             sx={{
               backgroundColor: alpha(colors.accent.main, 0.2),
               color: colors.accent.light,
@@ -176,6 +179,7 @@ export const WelcomePanel: React.FC<WelcomePanelProps> = ({ visible }) => {
         {/* Main Greeting */}
         <Typography
           variant="h4"
+          component="h1"
           sx={{
             fontWeight: 700,
             mb: 2,
@@ -203,6 +207,8 @@ export const WelcomePanel: React.FC<WelcomePanelProps> = ({ visible }) => {
 
         {/* Rotating Tip */}
         <Box
+          role="status"
+          aria-live="polite"
           sx={{
             mt: 2,
             p: 2,

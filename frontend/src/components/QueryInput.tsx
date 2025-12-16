@@ -156,12 +156,14 @@ export const QueryInput: React.FC<QueryInputProps> = ({
         onChange={handleFileSelect}
         accept=".json,.md"
         style={{ display: 'none' }}
+        aria-label="File Upload"
       />
 
       {/* Address Suggestions Dropdown */}
       {showSuggestions && suggestions.length > 0 && (
         <Paper
           elevation={8}
+          aria-live="assertive"
           sx={{
             position: 'absolute',
             bottom: '100%',
@@ -187,6 +189,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
               <ListItem key={`${suggestion.crid}-${index}`} disablePadding>
                 <ListItemButton
                   onClick={() => handleSuggestionSelect(suggestion)}
+                  aria-label={`Select suggestion: ${suggestion.value}`}
                   sx={{
                     py: 1.5,
                     '&:hover': {
@@ -204,6 +207,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
                         <Chip
                           label={`${Math.round(suggestion.score * 100)}% match`}
                           size="small"
+                          aria-label={`${Math.round(suggestion.score * 100)}% match`}
                           sx={{
                             ml: 1,
                             height: 18,
@@ -230,6 +234,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
             label={selectedFile.name}
             onDelete={() => setSelectedFile(null)}
             deleteIcon={<CloseIcon sx={{ fontSize: 16 }} />}
+            aria-label={`Selected file: ${selectedFile.name}. Click to remove.`}
             sx={{
               backgroundColor: alpha(colors.info.main, 0.15),
               borderColor: colors.info.main,
@@ -257,6 +262,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
           onFocus={() => query.length >= 2 && suggestions.length > 0 && setShowSuggestions(true)}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
           disabled={loading}
+          aria-label="Query Input"
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -297,6 +303,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
             <IconButton
               onClick={handleSend}
               disabled={loading || !query.trim()}
+              aria-label="Send Query"
               sx={{
                 width: 48,
                 height: 48,
@@ -336,6 +343,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
               size="small"
               checked={bypassCache}
               onChange={(e) => onBypassCacheChange(e.target.checked)}
+              aria-label="Bypass Cache"
               sx={{
                 '& .MuiSwitch-switchBase.Mui-checked': {
                   color: colors.warning.main,
@@ -362,6 +370,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
               startIcon={<AddIcon />}
               onClick={() => fileInputRef.current?.click()}
               disabled={loading}
+              aria-label="Add File"
               sx={{
                 color: colors.aws.orange,
                 borderColor: alpha(colors.aws.orange, 0.5),
@@ -383,6 +392,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
                   size="small"
                   startIcon={<DownloadIcon />}
                   onClick={(e) => setDownloadAnchor(e.currentTarget)}
+                  aria-label="Download Chat"
                   sx={{
                     color: colors.info.light,
                     borderColor: alpha(colors.info.main, 0.5),
@@ -411,13 +421,13 @@ export const QueryInput: React.FC<QueryInputProps> = ({
                   },
                 }}
               >
-                <MenuItem onClick={() => handleDownload('json')}>
+                <MenuItem onClick={() => handleDownload('json')} aria-label="Download as JSON">
                   <ListItemIcon>
                     <JsonIcon fontSize="small" sx={{ color: colors.info.light }} />
                   </ListItemIcon>
                   <ListItemText>Download as JSON</ListItemText>
                 </MenuItem>
-                <MenuItem onClick={() => handleDownload('csv')}>
+                <MenuItem onClick={() => handleDownload('csv')} aria-label="Download as CSV">
                   <ListItemIcon>
                     <CsvIcon fontSize="small" sx={{ color: colors.success.light }} />
                   </ListItemIcon>
@@ -433,6 +443,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
           startIcon={<ClearIcon />}
           onClick={onClear}
           disabled={messages.length === 0}
+          aria-label="New Chat"
           sx={{
             color: 'text.secondary',
             '&:hover': {

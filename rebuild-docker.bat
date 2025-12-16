@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 echo ============================================================
-echo    ICDA - Full Docker Rebuild (No Cache)
+echo    ICDA - Full Docker Rebuild (Optimized)
 echo ============================================================
 echo.
 
@@ -22,7 +22,7 @@ REM Step 3: Prune build cache
 echo [3/6] Pruning Docker build cache...
 docker builder prune -f
 
-REM Step 4: Rebuild frontend first (ensures fresh dist)
+REM Step 4: Build frontend locally (faster than Docker build)
 echo [4/6] Building fresh frontend...
 cd frontend
 if exist "node_modules" (
@@ -40,14 +40,19 @@ if %errorlevel% neq 0 (
 )
 cd ..
 
-REM Step 5: Build all images with no cache
-echo [5/6] Building Docker images (--no-cache)...
-docker-compose build --no-cache --pull
+REM Step 5: Build Docker image using pre-built frontend (much faster!)
+echo [5/6] Building Docker image (using pre-built frontend)...
+docker build -f Dockerfile.quick -t icda-prototype:latest .
 if %errorlevel% neq 0 (
     echo [ERROR] Docker build failed!
     pause
     exit /b 1
 )
+
+REM Also build MCP if docker-compose has it
+echo      Building MCP server images...
+docker-compose build mcp-server 2>nul
+docker-compose build mcp-knowledge 2>nul
 
 REM Step 6: Start services
 echo [6/6] Starting services...
