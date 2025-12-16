@@ -2,6 +2,13 @@
 
 This module provides an in-memory index of known addresses from customer
 data, enabling fast lookups and fuzzy matching for address verification.
+
+Matching algorithms:
+- Exact match by normalized key
+- Levenshtein edit distance for typo tolerance
+- Soundex phonetic matching for sound-alike errors
+- SequenceMatcher for subsequence similarity
+- Adaptive thresholds per component type
 """
 
 import logging
@@ -21,6 +28,294 @@ from icda.address_normalizer import (
 
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Advanced Matching Algorithms
+# =============================================================================
+
+def levenshtein_distance(s1: str, s2: str) -> int:
+    """Compute Levenshtein edit distance between two strings.
+
+    Edit distance is the minimum number of single-character edits
+    (insertions, deletions, substitutions) to transform s1 into s2.
+
+    Args:
+        s1: First string.
+        s2: Second string.
+
+    Returns:
+        Edit distance (0 = identical).
+    """
+    if len(s1) < len(s2):
+        return levenshtein_distance(s2, s1)
+
+    if len(s2) == 0:
+        return len(s1)
+
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            # Cost is 0 if characters match, 1 otherwise
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+
+    return previous_row[-1]
+
+
+def levenshtein_similarity(s1: str, s2: str) -> float:
+    """Compute Levenshtein similarity as a ratio (0.0 - 1.0).
+
+    Args:
+        s1: First string.
+        s2: Second string.
+
+    Returns:
+        Similarity ratio (1.0 = identical).
+    """
+    if not s1 and not s2:
+        return 1.0
+    if not s1 or not s2:
+        return 0.0
+
+    max_len = max(len(s1), len(s2))
+    distance = levenshtein_distance(s1, s2)
+    return 1.0 - (distance / max_len)
+
+
+def damerau_levenshtein_distance(s1: str, s2: str) -> int:
+    """Compute Damerau-Levenshtein distance (includes transpositions).
+
+    This handles adjacent character swaps (common typo: "teh" -> "the").
+
+    Args:
+        s1: First string.
+        s2: Second string.
+
+    Returns:
+        Edit distance including transpositions.
+    """
+    len1, len2 = len(s1), len(s2)
+
+    # Create distance matrix
+    d = [[0] * (len2 + 1) for _ in range(len1 + 1)]
+
+    for i in range(len1 + 1):
+        d[i][0] = i
+    for j in range(len2 + 1):
+        d[0][j] = j
+
+    for i in range(1, len1 + 1):
+        for j in range(1, len2 + 1):
+            cost = 0 if s1[i-1] == s2[j-1] else 1
+            d[i][j] = min(
+                d[i-1][j] + 1,      # Deletion
+                d[i][j-1] + 1,      # Insertion
+                d[i-1][j-1] + cost  # Substitution
+            )
+            # Transposition
+            if i > 1 and j > 1 and s1[i-1] == s2[j-2] and s1[i-2] == s2[j-1]:
+                d[i][j] = min(d[i][j], d[i-2][j-2] + cost)
+
+    return d[len1][len2]
+
+
+def soundex(s: str) -> str:
+    """Compute Soundex phonetic code for a string.
+
+    Soundex encodes words by their sound, so "Smith" and "Smyth"
+    produce the same code.
+
+    Args:
+        s: String to encode.
+
+    Returns:
+        4-character Soundex code (letter + 3 digits).
+    """
+    if not s:
+        return "0000"
+
+    # Normalize
+    s = s.upper()
+    s = re.sub(r'[^A-Z]', '', s)
+
+    if not s:
+        return "0000"
+
+    # Keep first letter
+    first_letter = s[0]
+
+    # Soundex mapping
+    mapping = {
+        'B': '1', 'F': '1', 'P': '1', 'V': '1',
+        'C': '2', 'G': '2', 'J': '2', 'K': '2', 'Q': '2', 'S': '2', 'X': '2', 'Z': '2',
+        'D': '3', 'T': '3',
+        'L': '4',
+        'M': '5', 'N': '5',
+        'R': '6',
+        # A, E, I, O, U, H, W, Y are dropped
+    }
+
+    # Convert to digits
+    coded = first_letter
+    prev_code = mapping.get(first_letter, '0')
+
+    for char in s[1:]:
+        code = mapping.get(char, '0')
+        if code != '0' and code != prev_code:
+            coded += code
+            if len(coded) == 4:
+                break
+        prev_code = code if code != '0' else prev_code
+
+    # Pad with zeros
+    return (coded + '0000')[:4]
+
+
+def metaphone_simple(s: str) -> str:
+    """Compute simplified Metaphone phonetic code.
+
+    Metaphone is more accurate than Soundex for English pronunciation.
+    This is a simplified implementation for common address terms.
+
+    Args:
+        s: String to encode.
+
+    Returns:
+        Metaphone code string.
+    """
+    if not s:
+        return ""
+
+    s = s.upper()
+    s = re.sub(r'[^A-Z]', '', s)
+
+    if not s:
+        return ""
+
+    # Common transformations
+    transformations = [
+        (r'^KN', 'N'),
+        (r'^GN', 'N'),
+        (r'^PN', 'N'),
+        (r'^AE', 'E'),
+        (r'^WR', 'R'),
+        (r'^WH', 'W'),
+        (r'MB$', 'M'),
+        (r'PH', 'F'),
+        (r'TCH', 'CH'),
+        (r'GH', ''),
+        (r'GN', 'N'),
+        (r'KN', 'N'),
+        (r'CK', 'K'),
+        (r'SCH', 'SK'),
+        (r'SH', 'X'),
+        (r'TH', '0'),  # 0 represents 'th' sound
+        (r'DG', 'J'),
+        (r'C(?=[IEY])', 'S'),
+        (r'C', 'K'),
+        (r'Q', 'K'),
+        (r'X', 'KS'),
+        (r'Z', 'S'),
+        (r'[AEIOU]', ''),  # Drop vowels except at start
+    ]
+
+    # Keep first character if vowel
+    first = s[0] if s[0] in 'AEIOU' else ''
+
+    for pattern, replacement in transformations:
+        s = re.sub(pattern, replacement, s)
+
+    # Remove duplicate adjacent letters
+    result = first
+    for char in s:
+        if not result or char != result[-1]:
+            result += char
+
+    return result[:6]  # Limit length
+
+
+def phonetic_match(s1: str, s2: str) -> float:
+    """Compute phonetic similarity using both Soundex and Metaphone.
+
+    Args:
+        s1: First string.
+        s2: Second string.
+
+    Returns:
+        Phonetic similarity score (0.0 - 1.0).
+    """
+    if not s1 or not s2:
+        return 0.0
+
+    # Soundex comparison
+    sx1, sx2 = soundex(s1), soundex(s2)
+    soundex_match = 1.0 if sx1 == sx2 else 0.0
+
+    # Metaphone comparison
+    mp1, mp2 = metaphone_simple(s1), metaphone_simple(s2)
+    if mp1 and mp2:
+        # Use sequence matcher on metaphone codes
+        metaphone_match = SequenceMatcher(None, mp1, mp2).ratio()
+    else:
+        metaphone_match = 0.0
+
+    # Combine scores (weight metaphone higher as it's more accurate)
+    return soundex_match * 0.4 + metaphone_match * 0.6
+
+
+# =============================================================================
+# Adaptive Thresholds
+# =============================================================================
+
+# Component-specific thresholds for matching
+# Higher threshold = stricter matching required
+COMPONENT_THRESHOLDS = {
+    "street_number": 1.0,    # Must be exact (or very close for typos)
+    "street_name": 0.70,     # Allow some variation (typos, abbreviations)
+    "street_type": 0.90,     # Should mostly match (standardized)
+    "city": 0.80,            # Some typo tolerance
+    "state": 1.0,            # Must be exact (2-letter code)
+    "zip_code": 1.0,         # Must be exact
+    "urbanization": 0.75,    # PR urbanizations can have variations
+}
+
+# Weights for overall similarity calculation
+COMPONENT_WEIGHTS = {
+    "street_number": 0.25,   # Critical for exact address
+    "street_name": 0.30,     # Most important identifier
+    "zip_code": 0.20,        # Strong geographic anchor
+    "city": 0.10,            # Supporting info
+    "state": 0.10,           # Usually derived from ZIP
+    "urbanization": 0.05,    # PR-specific, important when present
+}
+
+
+@dataclass(slots=True)
+class MatchExplanation:
+    """Detailed explanation of how a match score was computed.
+
+    Provides transparency into the matching algorithm's decision.
+    """
+    overall_score: float
+    component_scores: dict[str, float]
+    component_contributions: dict[str, float]
+    algorithms_used: list[str]
+    notes: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "overall_score": round(self.overall_score, 4),
+            "component_scores": {k: round(v, 4) for k, v in self.component_scores.items()},
+            "component_contributions": {k: round(v, 4) for k, v in self.component_contributions.items()},
+            "algorithms_used": self.algorithms_used,
+            "notes": self.notes,
+        }
 
 
 @dataclass(slots=True)
@@ -78,12 +373,14 @@ class MatchResult:
         score: Similarity score (0.0 - 1.0).
         match_type: How the match was found.
         customer_id: Associated customer ID.
+        explanation: Optional detailed scoring breakdown.
     """
 
     address: IndexedAddress
     score: float
     match_type: str  # "exact", "fuzzy_street", "fuzzy_zip", etc.
     customer_id: str
+    explanation: MatchExplanation | None = None
 
 
 class AddressIndex:
@@ -537,65 +834,357 @@ class AddressIndex:
         self,
         addr1: ParsedAddress,
         addr2: ParsedAddress,
-    ) -> float:
-        """Compute similarity score between two addresses."""
-        scores: list[float] = []
-        weights: list[float] = []
+        explain: bool = False,
+    ) -> float | tuple[float, MatchExplanation]:
+        """Compute similarity score between two addresses using multiple algorithms.
 
-        # Street number (exact match required for high score)
+        Uses a combination of:
+        - Levenshtein distance for typo detection
+        - Phonetic matching (Soundex/Metaphone) for sound-alike errors
+        - SequenceMatcher for subsequence similarity
+        - Adaptive component-specific thresholds
+
+        Args:
+            addr1: First parsed address.
+            addr2: Second parsed address.
+            explain: If True, return detailed explanation.
+
+        Returns:
+            Similarity score (0.0 - 1.0), or tuple of (score, explanation).
+        """
+        component_scores: dict[str, float] = {}
+        component_contributions: dict[str, float] = {}
+        algorithms_used: list[str] = []
+        notes: list[str] = []
+
+        total_weight = 0.0
+        weighted_score = 0.0
+
+        # Street number (needs exact or near-exact match)
         if addr1.street_number and addr2.street_number:
-            if addr1.street_number.lower() == addr2.street_number.lower():
-                scores.append(1.0)
+            num1 = addr1.street_number.lower()
+            num2 = addr2.street_number.lower()
+            if num1 == num2:
+                score = 1.0
             else:
-                scores.append(0.0)
-            weights.append(0.3)
+                # Allow for minor typos in street number (e.g., "101" vs "102")
+                score = levenshtein_similarity(num1, num2)
+                if score >= 0.8:  # Close but not exact
+                    notes.append(f"Street number near-match: {num1} ↔ {num2}")
+                    algorithms_used.append("levenshtein_street_number")
+            component_scores["street_number"] = score
+            weight = COMPONENT_WEIGHTS["street_number"]
+            contribution = score * weight
+            component_contributions["street_number"] = contribution
+            weighted_score += contribution
+            total_weight += weight
 
-        # Street name (fuzzy match)
+        # Street name (most important - use all algorithms)
         if addr1.street_name and addr2.street_name:
-            name_score = self._fuzzy_match_score(
-                self._normalize_street_name(addr1.street_name),
-                self._normalize_street_name(addr2.street_name),
-            )
-            scores.append(name_score)
-            weights.append(0.3)
+            name1 = self._normalize_street_name(addr1.street_name)
+            name2 = self._normalize_street_name(addr2.street_name)
 
-        # ZIP code (exact match)
+            score = self._advanced_string_match(name1, name2, "street_name")
+
+            component_scores["street_name"] = score
+            weight = COMPONENT_WEIGHTS["street_name"]
+            contribution = score * weight
+            component_contributions["street_name"] = contribution
+            weighted_score += contribution
+            total_weight += weight
+
+            if score < 1.0 and score > 0.5:
+                algorithms_used.append("multi_algorithm_street")
+                notes.append(f"Street fuzzy: '{name1}' ↔ '{name2}' = {score:.2f}")
+
+        # ZIP code (must be exact, but check for transposition typos)
         if addr1.zip_code and addr2.zip_code:
             if addr1.zip_code == addr2.zip_code:
-                scores.append(1.0)
+                score = 1.0
             else:
-                scores.append(0.0)
-            weights.append(0.2)
+                # Check for transposition (common typo: 22222 vs 22223)
+                dist = damerau_levenshtein_distance(addr1.zip_code, addr2.zip_code)
+                if dist == 1:
+                    score = 0.8  # Single character error in ZIP
+                    notes.append(f"ZIP near-match (1 edit): {addr1.zip_code} ↔ {addr2.zip_code}")
+                    algorithms_used.append("damerau_zip")
+                else:
+                    score = 0.0
+            component_scores["zip_code"] = score
+            weight = COMPONENT_WEIGHTS["zip_code"]
+            contribution = score * weight
+            component_contributions["zip_code"] = contribution
+            weighted_score += contribution
+            total_weight += weight
 
-        # City (fuzzy match)
+        # City (fuzzy match with phonetic support)
         if addr1.city and addr2.city:
-            city_score = self._fuzzy_match_score(
-                addr1.city.lower(),
-                addr2.city.lower(),
-            )
-            scores.append(city_score)
-            weights.append(0.1)
+            city1 = addr1.city.lower()
+            city2 = addr2.city.lower()
 
-        # State (exact match)
+            score = self._advanced_string_match(city1, city2, "city")
+
+            component_scores["city"] = score
+            weight = COMPONENT_WEIGHTS["city"]
+            contribution = score * weight
+            component_contributions["city"] = contribution
+            weighted_score += contribution
+            total_weight += weight
+
+            if score < 1.0 and score > 0.6:
+                algorithms_used.append("fuzzy_city")
+
+        # State (exact match only - 2 letter codes)
         if addr1.state and addr2.state:
             if addr1.state.upper() == addr2.state.upper():
-                scores.append(1.0)
+                score = 1.0
             else:
-                scores.append(0.0)
-            weights.append(0.1)
+                score = 0.0
+                notes.append(f"State mismatch: {addr1.state} ≠ {addr2.state}")
+            component_scores["state"] = score
+            weight = COMPONENT_WEIGHTS["state"]
+            contribution = score * weight
+            component_contributions["state"] = contribution
+            weighted_score += contribution
+            total_weight += weight
 
-        if not scores:
-            return 0.0
+        # Puerto Rico urbanization (important for PR addresses)
+        if addr1.is_puerto_rico and addr2.is_puerto_rico:
+            if addr1.urbanization and addr2.urbanization:
+                urb1 = addr1.urbanization.lower()
+                urb2 = addr2.urbanization.lower()
+                score = self._advanced_string_match(urb1, urb2, "urbanization")
 
-        # Weighted average
-        total_weight = sum(weights)
+                component_scores["urbanization"] = score
+                weight = COMPONENT_WEIGHTS["urbanization"]
+                contribution = score * weight
+                component_contributions["urbanization"] = contribution
+                weighted_score += contribution
+                total_weight += weight
+
+                if score < 1.0:
+                    notes.append(f"PR urbanization: '{urb1}' ↔ '{urb2}' = {score:.2f}")
+            elif addr1.urbanization or addr2.urbanization:
+                # One has urbanization, other doesn't - penalize
+                score = 0.5
+                component_scores["urbanization"] = score
+                weight = COMPONENT_WEIGHTS["urbanization"]
+                contribution = score * weight
+                component_contributions["urbanization"] = contribution
+                weighted_score += contribution
+                total_weight += weight
+                notes.append("PR address missing urbanization on one side")
+
         if total_weight == 0:
+            final_score = 0.0
+        else:
+            final_score = weighted_score / total_weight
+
+        if explain:
+            explanation = MatchExplanation(
+                overall_score=final_score,
+                component_scores=component_scores,
+                component_contributions=component_contributions,
+                algorithms_used=algorithms_used if algorithms_used else ["exact_match"],
+                notes=notes,
+            )
+            return final_score, explanation
+
+        return final_score
+
+    def _advanced_string_match(self, s1: str, s2: str, component: str) -> float:
+        """Compute string similarity using multiple algorithms.
+
+        Combines:
+        1. Exact match (highest priority)
+        2. SequenceMatcher (subsequence matching)
+        3. Levenshtein similarity (edit distance)
+        4. Phonetic matching (sound-alike)
+
+        Args:
+            s1: First string (normalized).
+            s2: Second string (normalized).
+            component: Component type for threshold lookup.
+
+        Returns:
+            Best similarity score from all algorithms.
+        """
+        if not s1 or not s2:
             return 0.0
-        return sum(s * w for s, w in zip(scores, weights)) / total_weight
+
+        # Exact match
+        if s1 == s2:
+            return 1.0
+
+        # Run multiple algorithms and take the best
+        scores = []
+
+        # 1. SequenceMatcher (good for subsequences)
+        seq_score = SequenceMatcher(None, s1, s2).ratio()
+        scores.append(seq_score)
+
+        # 2. Levenshtein (good for typos)
+        lev_score = levenshtein_similarity(s1, s2)
+        scores.append(lev_score)
+
+        # 3. Phonetic match (good for sound-alike errors like "Smith"/"Smyth")
+        phon_score = phonetic_match(s1, s2)
+        scores.append(phon_score)
+
+        # 4. Check if one is a prefix of the other (for abbreviations)
+        if s1.startswith(s2) or s2.startswith(s1):
+            # Significant prefix match
+            min_len = min(len(s1), len(s2))
+            max_len = max(len(s1), len(s2))
+            prefix_score = min_len / max_len
+            scores.append(prefix_score)
+
+        # Take the maximum score (most permissive matching)
+        best_score = max(scores)
+
+        # Apply component-specific threshold
+        threshold = COMPONENT_THRESHOLDS.get(component, 0.6)
+        if best_score < threshold:
+            # Reduce score further if below threshold
+            best_score *= 0.8
+
+        return best_score
 
     def _fuzzy_match_score(self, s1: str, s2: str) -> float:
-        """Compute fuzzy match score between two strings."""
-        return SequenceMatcher(None, s1, s2).ratio()
+        """Compute fuzzy match score using multiple algorithms.
+
+        This is the enhanced version that combines:
+        - SequenceMatcher (original algorithm)
+        - Levenshtein distance
+        - Phonetic matching
+
+        Args:
+            s1: First string.
+            s2: Second string.
+
+        Returns:
+            Best similarity score (0.0 - 1.0).
+        """
+        if not s1 or not s2:
+            return 0.0
+
+        if s1 == s2:
+            return 1.0
+
+        # Use advanced matching with street_name threshold (most common use)
+        return self._advanced_string_match(s1, s2, "street_name")
+
+    def lookup_fuzzy_with_explanation(
+        self,
+        parsed: ParsedAddress,
+        threshold: float = 0.5,
+        limit: int = 10,
+    ) -> list[MatchResult]:
+        """Perform fuzzy matching with detailed explanations.
+
+        This is the "debug mode" version of lookup_fuzzy that provides
+        insight into why matches scored the way they did.
+
+        Args:
+            parsed: Parsed address to match.
+            threshold: Minimum similarity score.
+            limit: Maximum results to return.
+
+        Returns:
+            List of MatchResult with explanations, sorted by score.
+        """
+        results: list[MatchResult] = []
+
+        # Strategy 1: If we have ZIP, search within ZIP
+        if parsed.zip_code:
+            zip_addresses = self._by_zip.get(parsed.zip_code, [])
+            for indexed in zip_addresses:
+                score_result = self._compute_similarity(parsed, indexed.parsed, explain=True)
+                score, explanation = score_result if isinstance(score_result, tuple) else (score_result, None)
+                if score >= threshold:
+                    results.append(MatchResult(
+                        address=indexed,
+                        score=score,
+                        match_type="fuzzy_zip",
+                        customer_id=indexed.customer_id,
+                        explanation=explanation,
+                    ))
+
+        # Strategy 2: If we have city/state, search in that area
+        elif parsed.city and parsed.state:
+            key = f"{parsed.city.lower()}|{parsed.state.upper()}"
+            city_addresses = self._by_city_state.get(key, [])
+            for indexed in city_addresses:
+                score_result = self._compute_similarity(parsed, indexed.parsed, explain=True)
+                score, explanation = score_result if isinstance(score_result, tuple) else (score_result, None)
+                if score >= threshold:
+                    results.append(MatchResult(
+                        address=indexed,
+                        score=score,
+                        match_type="fuzzy_city",
+                        customer_id=indexed.customer_id,
+                        explanation=explanation,
+                    ))
+
+        # Strategy 3: Match by street name
+        if parsed.street_name:
+            normalized = self._normalize_street_name(parsed.street_name)
+            street_addresses = self._by_street_name.get(normalized, [])
+            for indexed in street_addresses:
+                if any(r.address == indexed for r in results):
+                    continue
+                score_result = self._compute_similarity(parsed, indexed.parsed, explain=True)
+                score, explanation = score_result if isinstance(score_result, tuple) else (score_result, None)
+                if score >= threshold:
+                    results.append(MatchResult(
+                        address=indexed,
+                        score=score,
+                        match_type="fuzzy_street",
+                        customer_id=indexed.customer_id,
+                        explanation=explanation,
+                    ))
+
+        # Sort by score descending and limit
+        results.sort(key=lambda r: r.score, reverse=True)
+        return results[:limit]
+
+    def match_address_robust(
+        self,
+        input_address: str,
+        threshold: float = 0.5,
+        limit: int = 5,
+        explain: bool = False,
+    ) -> list[MatchResult]:
+        """High-level robust address matching with all strategies.
+
+        This is the main entry point for address matching that:
+        1. Parses the input address
+        2. Tries exact match first
+        3. Falls back to multi-algorithm fuzzy matching
+        4. Optionally provides detailed explanations
+
+        Args:
+            input_address: Raw address string to match.
+            threshold: Minimum similarity score (default 0.5 for more permissive).
+            limit: Maximum results to return.
+            explain: Include match explanations.
+
+        Returns:
+            List of MatchResult sorted by score.
+        """
+        # Parse the input
+        parsed = AddressNormalizer.normalize(input_address)
+
+        # Try exact match first
+        exact_matches = self.lookup_exact(parsed)
+        if exact_matches:
+            return exact_matches[:limit]
+
+        # Use robust fuzzy matching
+        if explain:
+            return self.lookup_fuzzy_with_explanation(parsed, threshold, limit)
+        else:
+            return self.lookup_fuzzy(parsed, threshold)[:limit]
 
     def stats(self) -> dict[str, Any]:
         """Return index statistics."""
@@ -605,5 +1194,14 @@ class AddressIndex:
             "unique_states": len(self._by_state),
             "unique_cities": len(self._by_city_state),
             "unique_streets": len(self._by_street_name),
+            "unique_urbanizations": len(self._by_urbanization),
             "indexed": self._indexed,
+            "matching_algorithms": [
+                "exact_match",
+                "levenshtein_distance",
+                "damerau_levenshtein",
+                "soundex_phonetic",
+                "metaphone_phonetic",
+                "sequence_matcher",
+            ],
         }
