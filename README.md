@@ -1,166 +1,134 @@
-# ICDA Prototype
-## Intelligent Customer Data Access - NLP-Powered Query Demo
+# ICDA - Intelligent Customer Data Access
 
-This prototype demonstrates the core ICDA architecture:
-- Natural language query input
-- Query classification (lookup vs complex)
-- Input/Output guardrails (PII blocking)
-- Caching layer
-- AWS Bedrock Nova integration (with demo mode fallback)
-- Tool calling for data access
+AI-powered customer data assistant with semantic search, address verification, and RAG knowledge base.
 
----
-
-## Quick Start
+## Quick Start (No Docker Required!)
 
 ```bash
-# 1. Navigate to project
-cd C:\Users\bisho\IdeaProjects\icda-prototype
+# Clone and run
+git clone <repo>
+cd icda-prototype
 
-# 2. Create virtual environment
-python -m venv venv
-venv\Scripts\activate
+# Windows
+run.bat
 
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Copy and configure environment
-copy .env.example .env
-# Edit .env if needed (defaults work with your AWS profile)
-
-# 5. Run the server
-uvicorn main:app --reload --port 8000
-
-# 6. Open browser
-start http://localhost:8000
+# Mac/Linux
+./run.sh
 ```
 
----
+That's it! The app runs at http://localhost:8000
 
-## Features Demonstrated
+## Two Modes
 
-### 1. Query Classification
-- **LOOKUP**: Direct CRID lookups bypass AI entirely → <5ms response
-- **COMPLEX**: Natural language queries route to Bedrock Nova
-- **BLOCKED**: PII requests / off-topic queries blocked at guardrail
+### LITE MODE (Default - No AWS Required)
+- Customer database search & autocomplete
+- Address verification pipeline
+- Knowledge base (keyword search)
+- Full API functionality
 
-### 2. Guardrails
-**Input (blocks before processing):**
-- SSN, credit card, bank account requests
-- Off-topic queries (weather, poems, etc.)
+### FULL MODE (With AWS Credentials)
+- Everything in LITE MODE
+- Bedrock Nova AI assistant
+- Titan semantic embeddings
+- Vector similarity search
 
-**Output (redacts after response):**
-- Any PII patterns in results
+To enable FULL MODE, add AWS credentials to `.env`:
+```env
+AWS_ACCESS_KEY_ID=your_key
+AWS_SECRET_ACCESS_KEY=your_secret
+AWS_REGION=us-east-1
+```
 
-### 3. Caching
-- In-memory cache (swap for Redis in production)
-- Different TTLs by query type:
-  - Lookups: 1 hour
-  - Validations: 24 hours  
-  - Complex: 5 minutes
+## Docker Deployment
 
-### 4. Bedrock Integration
-- Uses Nova Micro by default
-- Full tool calling with `converse` API
-- Graceful fallback to demo mode if no AWS creds
+### Option 1: Core Services Only (Redis + OpenSearch)
+```bash
+docker-compose up -d redis opensearch
+```
+Then run the app locally with `run.bat` or `run.sh`.
 
----
+### Option 2: Full Stack (Everything in Docker)
+```bash
+docker-compose up -d
+```
+This starts: ICDA app + Redis + OpenSearch
+
+### Option 3: With MCP Servers (for Claude Code integration)
+```bash
+docker-compose --profile mcp up -d
+```
+This adds: MCP server + MCP Knowledge server (RAG for internal docs)
+
+### Environment Variables
+Create `.env` file:
+```env
+# AWS (required for AI features)
+AWS_ACCESS_KEY_ID=your_key
+AWS_SECRET_ACCESS_KEY=your_secret
+AWS_REGION=us-east-1
+
+# Services (auto-configured in Docker)
+REDIS_URL=redis://localhost:6379
+OPENSEARCH_HOST=http://localhost:9200
+```
 
 ## API Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Web UI |
-| `/api/query` | POST | Process a query |
-| `/api/health` | GET | Health check |
-| `/api/cache/stats` | GET | Cache statistics |
-| `/api/cache` | DELETE | Clear cache |
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/health` | Health check + mode status |
+| `POST /api/query` | AI query (FULL MODE) |
+| `GET /api/autocomplete/{field}?q=` | Autocomplete search |
+| `GET /api/search/semantic?q=` | Semantic search |
+| `GET /api/knowledge/search?q=` | Knowledge base search |
+| `POST /api/knowledge/upload` | Upload knowledge docs |
+| `POST /api/address/verify` | Address verification |
 
-### Query Request
-```json
-{
-  "query": "Show me Nevada customers who moved twice",
-  "bypass_cache": false
-}
-```
-
-### Query Response
-```json
-{
-  "success": true,
-  "query": "Show me Nevada customers who moved twice",
-  "query_type": "complex",
-  "response": "Found 3 customers...",
-  "cached": false,
-  "latency_ms": 1250,
-  "tool_used": "search_customers",
-  "model": "us.amazon.nova-micro-v1:0"
-}
-```
-
----
-
-## Example Queries
-
-**✓ Allowed:**
-- "Look up CRID-001"
-- "Show me Nevada customers who moved twice"
-- "How many customers are in each state?"
-- "Find customers in Las Vegas with 3+ moves"
-
-**✗ Blocked:**
-- "Show me SSN for CRID-001" → PII blocked
-- "What are their credit card numbers?" → PII blocked
-- "Write me a poem" → Off-topic blocked
-- "What's the weather today?" → Off-topic blocked
-
----
-
-## Architecture Mapping
-
-| Prototype | Production |
-|-----------|------------|
-| In-memory cache | ElastiCache Redis |
-| Mock customer data | C Engine + OpenSearch |
-| FastAPI | API Gateway + Lambda |
-| Single process | Multi-AZ Lambda |
-| Local Bedrock calls | VPC Endpoint to Bedrock |
-
----
-
-## Configuration
-
-Edit `.env` to customize:
-
-```env
-# Use a specific AWS profile
-AWS_PROFILE=NNGC
-
-# Change region (us-gov-west-1 for GovCloud)
-AWS_REGION=us-east-1
-
-# Force demo mode (no Bedrock calls)
-DEMO_MODE=true
-```
-
----
-
-## Next Steps
-
-1. **Test guardrails** - Try blocked queries
-2. **Test caching** - Same query twice shows cache hit
-3. **Test classification** - "CRID-001" vs "customers who moved"
-4. **Add real data** - Replace MOCK_CUSTOMERS with actual schema
-5. **Deploy to AWS** - SAM/CDK template coming next
-
----
-
-## Files
+## Project Structure
 
 ```
 icda-prototype/
-├── main.py           # FastAPI application (all-in-one)
-├── requirements.txt  # Python dependencies
-├── .env.example      # Environment template
-└── README.md         # This file
+├── main.py              # FastAPI app
+├── run.bat              # Windows quick start
+├── run.sh               # Mac/Linux quick start
+├── icda/                # Core modules
+│   ├── cache.py         # Redis + memory fallback
+│   ├── embeddings.py    # Titan embeddings
+│   ├── knowledge.py     # RAG knowledge base
+│   ├── nova.py          # Bedrock Nova AI
+│   └── vector_index.py  # OpenSearch + fallback
+├── knowledge/           # Knowledge documents (auto-indexed)
+└── customer_data.json   # Sample customer data
 ```
+
+## Adding Knowledge Documents
+
+Just drop files into the `knowledge/` folder - they auto-index on startup!
+
+```
+knowledge/
+├── address-standards/     # Category = "address-standards"
+│   └── your-doc.md
+├── examples/              # Category = "examples"
+│   └── test-cases.md
+└── any-file.md            # Category = "general"
+```
+
+**Supported formats:** `.md`, `.txt`, `.json`, `.pdf`, `.docx`, `.xlsx`, `.csv`, `.html`, `.py`, `.js`, `.ts`, `.yaml`
+
+**Auto-tagging:** Add YAML frontmatter for custom tags:
+```yaml
+---
+tags: [puerto-rico, validation, testing]
+---
+# Your Document Title
+```
+
+**Or just name files descriptively** - tags auto-inferred from filename:
+- `pr-address-examples.md` → tags: `puerto-rico`, `addressing`, `examples`
+
+**Re-index manually:** `POST /api/knowledge/reindex`
+
+## License
+
+MIT

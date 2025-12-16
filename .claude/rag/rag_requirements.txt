@@ -1,0 +1,21 @@
+# Core RAG dependencies (self-contained, no external accounts)
+chromadb>=0.4.24
+sentence-transformers>=2.5.1
+numpy>=1.24.3
+torch>=2.0.0
+transformers>=4.36.0
+
+# REST API (for adaptive serving)
+fastapi>=0.109.0
+uvicorn>=0.27.0
+pydantic>=2.0.0
+
+# Environment configuration
+python-dotenv>=1.0.0
+
+# Optional: Cloud integrations (only if needed)
+# mem0ai>=0.1.0            # Persistent memory management
+# supabase>=2.0.0          # Cloud vector storage
+# psycopg2-binary>=2.9.0   # PostgreSQL adapter
+# pgvector>=0.2.0          # Vector similarity in PostgreSQL
+# boto3>=1.34.0            # AWS Bedrock integration

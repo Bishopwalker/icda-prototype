@@ -1,67 +1,143 @@
+import os
+
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, NoCredentialsError
 
 from .database import CustomerDB
 
 
 class NovaClient:
+    """
+    Amazon Bedrock Nova client for AI-powered queries.
+    Gracefully handles missing AWS credentials.
+    """
     __slots__ = ("client", "model", "available", "db")
 
-    _PROMPT = "You are ICDA, an AI assistant for customer data queries. Be concise. Never provide SSN, financial, or health info."
+    _PROMPT = """You are ICDA, a customer data assistant. Be concise and helpful.
+
+QUERY INTERPRETATION:
+- Interpret queries flexibly, not literally
+- State names → abbreviations (Nevada=NV, California=CA, Texas=TX)
+- "high movers"/"frequent movers" → min_move_count 3+
+- Use reasonable defaults (limit=10 for searches)
+- Never provide SSN, financial, or health info
+- Use conversation history for context"""
 
     TOOLS = [
-        {"toolSpec": {"name": "lookup_crid", "description": "Look up customer by CRID",
-            "inputSchema": {"json": {"type": "object", "properties": {"crid": {"type": "string"}}, "required": ["crid"]}}}},
-        {"toolSpec": {"name": "search_customers", "description": "Search customers by state, city, or move count",
+        {"toolSpec": {"name": "lookup_crid", "description": "Look up a specific customer by their CRID (Customer Record ID). Use when user mentions a specific CRID or customer ID.",
+            "inputSchema": {"json": {"type": "object", "properties": {"crid": {"type": "string", "description": "The Customer Record ID (e.g., CRID-00001)"}}, "required": ["crid"]}}}},
+        {"toolSpec": {"name": "search_customers", "description": "Search for customers with flexible filters. Use when user asks about customers in a state/city, customers who moved, or general customer searches. Interpret informal language: 'Nevada folks'=state NV, 'high movers'=min_move_count 3+, 'California customers'=state CA.",
             "inputSchema": {"json": {"type": "object", "properties": {
-                "state": {"type": "string"}, "city": {"type": "string"},
-                "min_move_count": {"type": "integer"}, "limit": {"type": "integer"}}}}}},
-        {"toolSpec": {"name": "get_stats", "description": "Get customer statistics",
+                "state": {"type": "string", "description": "Two-letter state code (NV, CA, TX, NY, FL, etc). Convert state names to codes."},
+                "city": {"type": "string", "description": "City name to filter by"},
+                "min_move_count": {"type": "integer", "description": "Minimum number of moves. Use 2-3 for 'frequent movers', 5+ for 'high movers'"},
+                "limit": {"type": "integer", "description": "Max results to return (default 10, max 100)"}}}}}},
+        {"toolSpec": {"name": "get_stats", "description": "Get overall customer statistics including counts by state. Use for questions like 'how many customers', 'totals', 'breakdown', or any aggregate data questions.",
             "inputSchema": {"json": {"type": "object", "properties": {}}}}}
     ]
 
     def __init__(self, region: str, model: str, db: CustomerDB):
         self.model = model
         self.db = db
+        self.client = None
+        self.available = False
+
+        # Check if AWS credentials are configured
+        if not os.environ.get("AWS_ACCESS_KEY_ID") and not os.environ.get("AWS_PROFILE"):
+            print("Nova: No AWS credentials - AI features disabled (LITE MODE)")
+            return
+
         try:
             self.client = boto3.client("bedrock-runtime", region_name=region)
             self.available = True
+            print(f"Nova: Connected ({model})")
+        except NoCredentialsError:
+            print("Nova: AWS credentials not found - AI features disabled")
         except Exception as e:
-            print(f"Nova init failed: {e}")
-            self.available = False
+            print(f"Nova: Init failed - {e}")
 
-    def _converse(self, messages: list) -> dict:
+    def _converse(self, messages: list, context: str | None = None) -> dict:
+        system_prompts = [{"text": self._PROMPT}]
+        if context:
+            system_prompts.append({"text": f"\n\nRELEVANT DATA CONTEXT:\n{context}"})
+
         return self.client.converse(
             modelId=self.model,
             messages=messages,
-            system=[{"text": self._PROMPT}],
+            system=system_prompts,
             toolConfig={"tools": self.TOOLS, "toolChoice": {"auto": {}}},
-            inferenceConfig={"maxTokens": 1024, "temperature": 0.1}
+            inferenceConfig={"maxTokens": 4096, "temperature": 0.1}
         )
 
-    async def query(self, text: str) -> dict:
+    async def query(self, text: str, history: list[dict] | None = None, context: str | None = None) -> dict:
+        """
+        Query Nova with optional conversation history and RAG context.
+
+        Args:
+            text: The user's query
+            history: Previous messages in Bedrock format
+            context: Retrieved RAG context to augment the query
+
+        Returns:
+            dict with success, response, and optional tool used
+        """
         if not self.available:
-            return {"success": False, "error": "Nova not available"}
+            return {
+                "success": False, 
+                "error": "AI features not available (no AWS credentials). Running in LITE MODE - use /api/search or /api/autocomplete endpoints."
+            }
+
         try:
-            resp = self._converse([{"role": "user", "content": [{"text": text}]}])
+            # Build messages: history + current query
+            # Filter history to ensure only text content (no toolUse blocks that would require toolResult)
+            messages = []
+            if history:
+                for msg in history:
+                    # Only include messages with pure text content
+                    clean_content = [b for b in msg.get("content", []) if "text" in b]
+                    if clean_content:
+                        messages.append({"role": msg["role"], "content": clean_content})
+            messages.append({"role": "user", "content": [{"text": text}]})
+
+            resp = self._converse(messages, context=context)
             content = resp["output"]["message"]["content"]
 
-            if tool := next((b["toolUse"] for b in content if "toolUse" in b), None):
-                result = self._execute_tool(tool["name"], tool["input"])
-                follow = self._converse([
-                    {"role": "user", "content": [{"text": text}]},
+            # Handle ALL tool calls in the response
+            tools = [b["toolUse"] for b in content if "toolUse" in b]
+            if tools:
+                # Execute all tools and collect results
+                tool_results = []
+                tool_names = []
+                for tool in tools:
+                    result = self._execute_tool(tool["name"], tool["input"])
+                    tool_results.append({
+                        "toolResult": {
+                            "toolUseId": tool["toolUseId"],
+                            "content": [{"json": result}]
+                        }
+                    })
+                    tool_names.append(tool["name"])
+
+                # Continue with ALL tool results
+                follow_messages = messages + [
                     {"role": "assistant", "content": content},
-                    {"role": "user", "content": [{"toolResult": {"toolUseId": tool["toolUseId"], "content": [{"json": result}]}}]}
-                ])
+                    {"role": "user", "content": tool_results}
+                ]
+                follow = self._converse(follow_messages, context=context)
+
                 if out := next((b["text"] for b in follow["output"]["message"]["content"] if "text" in b), None):
-                    return {"success": True, "response": out, "tool": tool["name"]}
+                    return {"success": True, "response": out, "tool": ", ".join(tool_names)}
 
             if out := next((b["text"] for b in content if "text" in b), None):
                 return {"success": True, "response": out}
             return {"success": False, "error": "No response"}
 
         except ClientError as e:
-            return {"success": False, "error": f"Nova: {e.response['Error']['Message']}"}
+            error_msg = e.response.get("Error", {}).get("Message", str(e))
+            if "Access" in error_msg or "credentials" in error_msg.lower():
+                self.available = False
+                return {"success": False, "error": "AWS access denied - check IAM permissions"}
+            return {"success": False, "error": f"Nova: {error_msg}"}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -72,7 +148,7 @@ class NovaClient:
             case "search_customers":
                 return self.db.search(
                     state=params.get("state"), city=params.get("city"),
-                    min_moves=params.get("min_move_count"), limit=params.get("limit", 10)
+                    min_moves=params.get("min_move_count"), limit=params.get("limit")
                 )
             case "get_stats":
                 return self.db.stats()

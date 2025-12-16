@@ -1,0 +1,62 @@
+{
+  "project_type": "Python FastAPI",
+  "language": "python",
+  "frameworks": [
+    "FastAPI"
+  ],
+  "naming": {
+    "variables": "camelCase",
+    "functions": "snake_case",
+    "classes": "PascalCase",
+    "constants": "SCREAMING_SNAKE_CASE",
+    "files": "snake_case"
+  },
+  "file_organization": {
+    "source_directories": [],
+    "test_directories": [
+      "tests"
+    ],
+    "config_files": [
+      ".dockerignore",
+      ".env",
+      ".env.docker",
+      ".env.example",
+      ".env.local",
+      "customer_data.json",
+      "docker-compose.yml",
+      "package-lock.json",
+      "package.json"
+    ]
+  },
+  "documentation": {
+    "has_docstrings": true,
+    "docstring_style": "google",
+    "has_type_hints": true
+  },
+  "error_handling": "Catch-all handler",
+  "testing": {
+    "framework": "",
+    "naming_pattern": ""
+  },
+  "rules": [
+    {
+      "category": "Naming",
+      "rule": "Variables use camelCase",
+      "confidence": 0.8,
+      "examples": [
+        "generated_households",
+        "generated_businesses",
+        "cfg"
+      ]
+    },
+    {
+      "category": "API",
+      "rule": "Uses FastAPI route decorators",
+      "confidence": 0.9,
+      "examples": [
+        "@app.get",
+        "@router.post"
+      ]
+    }
+  ]
+}

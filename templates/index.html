@@ -19,7 +19,17 @@
         .guardrail-btn:hover { background: rgba(255,255,255,0.15); }
         .guardrail-btn.active { background: rgba(255,82,82,0.3); border-color: #ff5252; color: #ff5252; }
         .guardrail-btn.active::before { content: ""; margin-right: 0.3rem; }
-        .chat { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; min-height: 400px; max-height: 500px; overflow-y: auto; }
+        .chat-wrapper { position: relative; margin-bottom: 1.5rem; }
+        .chat-header { display: flex; justify-content: flex-end; padding: 0.5rem 1rem; background: rgba(255,255,255,0.03); border-radius: 16px 16px 0 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .chat-header.hidden { display: none; }
+        .download-btn { background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.3); color: #00d4ff; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.3rem; }
+        .download-btn:hover { background: rgba(0,212,255,0.2); }
+        .download-menu { position: absolute; right: 1rem; top: 2.5rem; background: #1a1a2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.5rem 0; z-index: 100; display: none; }
+        .download-menu.show { display: block; }
+        .download-menu button { display: block; width: 100%; text-align: left; background: none; border: none; color: #fff; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.85rem; }
+        .download-menu button:hover { background: rgba(0,212,255,0.1); }
+        .chat { background: rgba(255,255,255,0.05); border-radius: 0 0 16px 16px; padding: 1.5rem; min-height: 400px; max-height: calc(100vh - 280px); overflow-y: auto; flex-grow: 1; }
+        .chat.no-messages { border-radius: 16px; }
         .msg { margin-bottom: 1rem; padding: 1rem; border-radius: 12px; max-width: 85%; }
         .msg.user { background: #00d4ff; color: #000; margin-left: auto; }
         .msg.bot { background: rgba(255,255,255,0.1); }
@@ -57,7 +67,19 @@
                 <span class="guardrail-btn active" data-guard="offtopic" onclick="toggleGuard(this)">Block Off-Topic</span>
             </div>
         </header>
-        <div class="chat" id="chat"></div>
+        <div class="chat-wrapper">
+            <div class="chat-header hidden" id="chatHeader">
+                <button class="download-btn" onclick="toggleDownloadMenu()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                    Download
+                </button>
+                <div class="download-menu" id="downloadMenu">
+                    <button onclick="downloadResults('json')">📄 Download as JSON</button>
+                    <button onclick="downloadResults('csv')">📊 Download as CSV</button>
+                </div>
+            </div>
+            <div class="chat no-messages" id="chat"></div>
+        </div>
         <div class="input-area">
             <input type="text" id="q" placeholder="Ask about customers..." />
             <button id="btn" onclick="send()">Send</button>
@@ -74,9 +96,13 @@
     </div>
     <script>
         const chat = document.getElementById('chat'), q = document.getElementById('q'), btn = document.getElementById('btn');
+        const chatHeader = document.getElementById('chatHeader'), downloadMenu = document.getElementById('downloadMenu');
 
         // Guardrail state
         const guardrails = { pii: true, financial: true, credentials: true, offtopic: true };
+
+        // Store messages for download
+        const messages = [];
 
         function toggleGuard(el) {
             const guard = el.dataset.guard;
@@ -86,12 +112,75 @@
 
         const setQ = v => { q.value = v; q.focus(); };
 
-        const addMsg = (txt, type, meta) => {
+        function toggleDownloadMenu() {
+            downloadMenu.classList.toggle('show');
+        }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.download-btn') && !e.target.closest('.download-menu')) {
+                downloadMenu.classList.remove('show');
+            }
+        });
+
+        function downloadResults(format) {
+            downloadMenu.classList.remove('show');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            let content, filename, mimeType;
+
+            if (format === 'json') {
+                content = JSON.stringify(messages, null, 2);
+                filename = `icda-chat-${timestamp}.json`;
+                mimeType = 'application/json';
+            } else {
+                const headers = ['ID', 'Type', 'Content', 'Timestamp', 'Route', 'Latency (ms)', 'Cached', 'Tool'];
+                const rows = messages.map(msg => [
+                    msg.id,
+                    msg.type,
+                    `"${(msg.content || '').replace(/"/g, '""')}"`,
+                    msg.timestamp,
+                    msg.route || '',
+                    msg.latency_ms || '',
+                    msg.cached ? 'Yes' : 'No',
+                    msg.tool || ''
+                ]);
+                content = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+                filename = `icda-chat-${timestamp}.csv`;
+                mimeType = 'text/csv';
+            }
+
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        const addMsg = (txt, type, meta, msgData = {}) => {
             const d = document.createElement('div');
             d.className = 'msg ' + type;
             d.innerHTML = txt + (meta ? `<div class="meta">${meta}</div>` : '');
             chat.appendChild(d);
             chat.scrollTop = chat.scrollHeight;
+
+            // Store message for download
+            messages.push({
+                id: messages.length + 1,
+                type: type,
+                content: txt,
+                timestamp: new Date().toISOString(),
+                ...msgData
+            });
+
+            // Show download header and adjust chat styling when messages exist
+            if (messages.length > 0) {
+                chatHeader.classList.remove('hidden');
+                chat.classList.remove('no-messages');
+            }
         };
 
         async function send() {
@@ -109,7 +198,12 @@
                 const d = await r.json();
                 const msgType = d.blocked ? 'blocked' : (d.success ? 'bot' : 'error');
                 const routeInfo = d.route ? ` | ${d.route}` : '';
-                addMsg(d.response, msgType, `${d.latency_ms}ms | ${d.cached ? 'Cached' : 'Fresh'}${routeInfo}${d.tool ? ' | ' + d.tool : ''}`);
+                addMsg(d.response, msgType, `${d.latency_ms}ms | ${d.cached ? 'Cached' : 'Fresh'}${routeInfo}${d.tool ? ' | ' + d.tool : ''}`, {
+                    route: d.route,
+                    latency_ms: d.latency_ms,
+                    cached: d.cached,
+                    tool: d.tool
+                });
                 fetch('/api/cache/stats').then(r => r.json()).then(d => document.getElementById('cache').textContent = `Cache: ${d.keys || 0}`);
             } catch(e) { addMsg('Error: ' + e.message, 'error'); }
             btn.disabled = false;
@@ -117,8 +211,12 @@
 
         fetch('/api/health').then(r => r.json()).then(d => {
             const s = document.getElementById('status');
-            s.textContent = d.nova ? 'Nova Connected' : 'Nova Unavailable';
-            s.className = 'badge' + (d.nova ? ' active' : '');
+            const allGood = d.redis && d.opensearch && d.embedder && d.nova;
+            s.textContent = allGood ? `All Systems Go (${d.customers.toLocaleString()} customers)` :
+                `Redis:${d.redis ? '✓' : '✗'} OS:${d.opensearch ? '✓' : '✗'} Nova:${d.nova ? '✓' : '✗'}`;
+            s.className = 'badge' + (allGood ? ' active' : '');
+        }).catch(e => {
+            document.getElementById('status').textContent = 'API Offline';
         });
 
         q.addEventListener('keypress', e => { if (e.key === 'Enter') send(); });

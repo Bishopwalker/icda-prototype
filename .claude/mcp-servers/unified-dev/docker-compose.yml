@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  mcp-server:
+    build:
+      context: ../..
+      dockerfile: mcp-servers/unified-dev/Dockerfile
+    image: universal-context-mcp:latest
+    container_name: uct-mcp-server
+
+    # For stdio transport (default MCP)
+    stdin_open: true
+    tty: true
+
+    volumes:
+      # Persist RAG index and memory
+      - mcp-data:/app/data
+      # Mount user's project for indexing (optional)
+      - ${PROJECT_PATH:-./project}:/app/project:ro
+
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - VECTOR_PROVIDER=chroma
+      - CHROMA_PERSIST_DIR=/app/data/chroma
+      - MEM0_MODE=local
+      - PROJECT_ROOT=/app/project
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+    networks:
+      - mcp-network
+
+  # Optional: SSE transport for web clients
+  mcp-server-sse:
+    build:
+      context: ../..
+      dockerfile: mcp-servers/unified-dev/Dockerfile
+    image: universal-context-mcp:latest
+    container_name: uct-mcp-sse
+
+    ports:
+      - "${MCP_PORT:-3000}:3000"
+
+    volumes:
+      - mcp-data:/app/data
+      - ${PROJECT_PATH:-./project}:/app/project:ro
+
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - VECTOR_PROVIDER=chroma
+      - CHROMA_PERSIST_DIR=/app/data/chroma
+      - MEM0_MODE=local
+      - PROJECT_ROOT=/app/project
+      - MCP_TRANSPORT=sse
+      - MCP_PORT=3000
+
+    security_opt:
+      - no-new-privileges:true
+
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+
+    networks:
+      - mcp-network
+
+    profiles:
+      - sse  # Only start with: docker-compose --profile sse up
+
+networks:
+  mcp-network:
+    driver: bridge
+
+volumes:
+  mcp-data:
+    driver: local

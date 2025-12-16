@@ -1,0 +1,49 @@
+/* Global styles - MUI CssBaseline handles most reset styles */
+:root {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Spin animation for loading indicators */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Ensure body takes full viewport with slight zoom out for better fit */
+html {
+  font-size: 14px; /* Slight reduction from 16px default for better viewport fit */
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  overflow: hidden; /* Prevent body scroll, let app handle it */
+}
+
+#root {
+  min-height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+/* Responsive font scaling */
+@media (min-width: 1600px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 1200px) {
+  html {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 900px) {
+  html {
+    font-size: 12px;
+  }
+}

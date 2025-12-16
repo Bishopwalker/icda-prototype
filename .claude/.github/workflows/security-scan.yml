@@ -1,0 +1,262 @@
+# Security Scanning Pipeline
+# FedRAMP/GovCloud Compliant CI/CD Security Scanning
+name: Security Scanning
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Daily security scan at 6 AM UTC
+    - cron: '0 6 * * *'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+permissions:
+  contents: read
+  security-events: write
+  packages: read
+
+jobs:
+  # Stage 1: Static Analysis (SAST)
+  sast:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Semgrep SAST
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/owasp-top-ten
+            p/security-audit
+            p/secrets
+            p/python
+            p/javascript
+          generateSarif: true
+
+      - name: Upload Semgrep results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+
+  # Stage 2: Secrets Detection
+  secrets:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog Secrets Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          extra_args: --only-verified
+
+      - name: Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Stage 3: Dependency Scanning (SCA)
+  dependency-scan:
+    name: Dependency Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install safety pip-audit
+
+      - name: Safety check Python dependencies
+        run: |
+          find . -name "requirements*.txt" -exec safety check -r {} \; || true
+
+      - name: Pip audit
+        run: |
+          find . -name "requirements*.txt" -exec pip-audit -r {} \; || true
+
+      - name: Snyk dependency scan
+        uses: snyk/actions/python@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+  # Stage 4: Container Security
+  container-scan:
+    name: Container Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image for scanning
+        run: |
+          docker build -t ${{ env.IMAGE_NAME }}:scan .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:scan
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          vuln-type: 'os,library'
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Dockle linter
+        uses: erzz/dockle-action@v1
+        with:
+          image: ${{ env.IMAGE_NAME }}:scan
+          failure-threshold: high
+          exit-code: 1
+
+      - name: Hadolint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: error
+
+  # Stage 5: SBOM Generation
+  sbom:
+    name: SBOM Generation
+    runs-on: ubuntu-latest
+    needs: [container-scan]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .
+
+      - name: Install Syft
+        uses: anchore/sbom-action/download-syft@v0
+
+      - name: Generate SBOM (SPDX)
+        run: |
+          syft ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -o spdx-json=sbom-spdx.json \
+            -o cyclonedx-json=sbom-cyclonedx.json
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom-reports
+          path: |
+            sbom-spdx.json
+            sbom-cyclonedx.json
+
+      - name: Vulnerability scan from SBOM
+        uses: anchore/scan-action@v3
+        with:
+          sbom: sbom-spdx.json
+          fail-build: false
+          output-format: sarif
+
+  # Stage 6: Infrastructure as Code Scanning
+  iac-scan:
+    name: IaC Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: dockerfile,kubernetes,github_actions
+          soft_fail: true
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+
+      - name: Upload Checkov results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: checkov-results.sarif
+
+      - name: Run KICS
+        uses: checkmarx/kics-github-action@v1.7
+        with:
+          path: .
+          fail_on: high
+          output_formats: json,sarif
+          output_path: kics-results
+
+  # Stage 7: Security Report Summary
+  security-report:
+    name: Security Report
+    runs-on: ubuntu-latest
+    needs: [sast, secrets, dependency-scan, container-scan, sbom, iac-scan]
+    if: always()
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        continue-on-error: true
+
+      - name: Generate security summary
+        run: |
+          echo "# Security Scan Summary" > security-summary.md
+          echo "" >> security-summary.md
+          echo "**Scan Date:** $(date -u)" >> security-summary.md
+          echo "**Commit:** ${{ github.sha }}" >> security-summary.md
+          echo "**Branch:** ${{ github.ref_name }}" >> security-summary.md
+          echo "" >> security-summary.md
+          echo "## Scan Results" >> security-summary.md
+          echo "" >> security-summary.md
+          echo "| Stage | Status |" >> security-summary.md
+          echo "|-------|--------|" >> security-summary.md
+          echo "| SAST | ${{ needs.sast.result }} |" >> security-summary.md
+          echo "| Secrets | ${{ needs.secrets.result }} |" >> security-summary.md
+          echo "| Dependencies | ${{ needs.dependency-scan.result }} |" >> security-summary.md
+          echo "| Container | ${{ needs.container-scan.result }} |" >> security-summary.md
+          echo "| SBOM | ${{ needs.sbom.result }} |" >> security-summary.md
+          echo "| IaC | ${{ needs.iac-scan.result }} |" >> security-summary.md
+
+      - name: Upload security summary
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-summary
+          path: security-summary.md
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('security-summary.md', 'utf8');
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: summary
+            });

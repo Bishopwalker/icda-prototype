@@ -1,0 +1,76 @@
+# ============================================
+# ICDA UNIFIED BUILD - One Image, Everything Works
+# ============================================
+# Multi-stage build: Frontend (Node) -> Backend (Python)
+# Auto-indexes Code RAG on startup
+# ============================================
+
+# ============================================
+# Stage 1: Build Frontend
+# ============================================
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /build/frontend
+
+# Copy package files for layer caching
+COPY frontend/package*.json ./
+
+# Install dependencies
+RUN npm ci --silent 2>/dev/null || npm install --silent
+
+# Copy source and build
+COPY frontend/ ./
+RUN npm run build
+
+# ============================================
+# Stage 2: Production Runtime
+# ============================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Copy Python requirements and install
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY main.py .
+COPY customer_data.json .
+COPY icda/ ./icda/
+COPY templates/ ./templates/
+COPY knowledge/ ./knowledge/
+COPY index_customers.py .
+COPY index_knowledge.py .
+
+# Copy built frontend from builder stage
+COPY --from=frontend-builder /build/frontend/dist ./frontend/dist
+
+# Copy startup script
+COPY docker-startup.sh /app/docker-startup.sh
+RUN chmod +x /app/docker-startup.sh
+
+# Environment defaults
+ENV AWS_REGION=us-east-1 \
+    NOVA_MODEL=us.amazon.nova-micro-v1:0 \
+    TITAN_EMBED_MODEL=amazon.titan-embed-text-v2:0 \
+    REDIS_URL="" \
+    OPENSEARCH_HOST="" \
+    PYTHONUNBUFFERED=1 \
+    AUTO_INDEX_CODE=true
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
+
+# Expose port
+EXPOSE 8000
+
+# Run startup script which handles initialization and starts uvicorn
+CMD ["/app/docker-startup.sh"]

@@ -1,12 +1,16 @@
 import json
 import re
 from pathlib import Path
+from bisect import bisect_left
 
 
 class CustomerDB:
-    __slots__ = ("customers", "by_crid", "by_state")
+    __slots__ = ("customers", "by_crid", "by_state", "address_index", "name_index", "city_index")
 
-    STATE_NAMES = {"NV": "nevada", "CA": "california", "TX": "texas", "AZ": "arizona", "FL": "florida"}
+    STATE_NAMES = {"NV": "nevada", "CA": "california", "TX": "texas", "AZ": "arizona", "FL": "florida",
+                   "NY": "new york", "WA": "washington", "CO": "colorado", "VA": "virginia",
+                   "GA": "georgia", "NC": "north carolina", "IL": "illinois", "PA": "pennsylvania",
+                   "OH": "ohio", "MI": "michigan"}
 
     def __init__(self, data_file: Path):
         self.customers = self._load(data_file)
@@ -14,6 +18,8 @@ class CustomerDB:
         self.by_state: dict[str, list] = {}
         for c in self.customers:
             self.by_state.setdefault(c["state"], []).append(c)
+        # Build autocomplete indexes
+        self._build_autocomplete_indexes()
 
     def _load(self, path: Path) -> list[dict]:
         if path.exists():
@@ -22,6 +28,131 @@ class CustomerDB:
             return data
         print(f"{path} not found")
         return []
+
+    def _build_autocomplete_indexes(self):
+        """Build sorted indexes for fast prefix-based autocomplete"""
+        # Address index: (lowercase_address, customer)
+        self.address_index = sorted(
+            [(c["address"].lower(), c) for c in self.customers],
+            key=lambda x: x[0]
+        )
+        # Name index: (lowercase_name, customer)
+        self.name_index = sorted(
+            [(c["name"].lower(), c) for c in self.customers],
+            key=lambda x: x[0]
+        )
+        # City index: (lowercase_city, customer)
+        self.city_index = sorted(
+            [(c["city"].lower(), c) for c in self.customers],
+            key=lambda x: x[0]
+        )
+        print(f"Built autocomplete indexes for {len(self.customers)} customers")
+
+    def autocomplete(self, field: str, prefix: str, limit: int = 10) -> dict:
+        """
+        Fast prefix-based autocomplete using binary search.
+        field: 'address', 'name', or 'city'
+        prefix: the text to match
+        limit: max results to return
+        """
+        prefix_lower = prefix.lower().strip()
+        if not prefix_lower:
+            return {"success": False, "error": "Empty prefix"}
+
+        # Select the appropriate index
+        index = {
+            "address": self.address_index,
+            "name": self.name_index,
+            "city": self.city_index
+        }.get(field)
+
+        if not index:
+            return {"success": False, "error": f"Unknown field: {field}. Use 'address', 'name', or 'city'"}
+
+        # Binary search for the start position
+        pos = bisect_left(index, (prefix_lower,))
+
+        # Collect matches
+        results = []
+        seen_values = set()  # For deduplication (e.g., same city name)
+
+        while pos < len(index) and len(results) < limit:
+            value, customer = index[pos]
+            if not value.startswith(prefix_lower):
+                break
+
+            # For city autocomplete, deduplicate
+            if field == "city":
+                city_key = customer["city"].lower()
+                if city_key not in seen_values:
+                    seen_values.add(city_key)
+                    results.append({
+                        "value": customer["city"],
+                        "state": customer["state"],
+                        "count": sum(1 for c in self.customers if c["city"].lower() == city_key)
+                    })
+            else:
+                results.append({
+                    "crid": customer["crid"],
+                    "value": customer[field],
+                    "name": customer["name"],
+                    "city": customer["city"],
+                    "state": customer["state"]
+                })
+            pos += 1
+
+        return {"success": True, "field": field, "prefix": prefix, "count": len(results), "data": results}
+
+    def autocomplete_fuzzy(self, field: str, query: str, limit: int = 10) -> dict:
+        """
+        Fuzzy autocomplete using trigram-like similarity.
+        Slower but handles typos and partial matches.
+        """
+        query_lower = query.lower().strip()
+        if len(query_lower) < 2:
+            return {"success": False, "error": "Query too short (min 2 chars)"}
+
+        # Select field to search
+        if field not in ("address", "name", "city"):
+            return {"success": False, "error": f"Unknown field: {field}"}
+
+        # Score each customer by similarity
+        def similarity(text: str) -> float:
+            text_lower = text.lower()
+            # Exact prefix match = highest score
+            if text_lower.startswith(query_lower):
+                return 1.0 + len(query_lower) / len(text_lower)
+            # Contains match
+            if query_lower in text_lower:
+                return 0.8
+            # Word starts with query
+            words = text_lower.split()
+            if any(w.startswith(query_lower) for w in words):
+                return 0.7
+            # Character overlap (trigram-like)
+            query_chars = set(query_lower)
+            text_chars = set(text_lower)
+            overlap = len(query_chars & text_chars) / len(query_chars)
+            return overlap * 0.5 if overlap > 0.6 else 0
+
+        scored = []
+        seen = set()
+        for c in self.customers:
+            value = c[field]
+            score = similarity(value)
+            if score > 0.4 and value.lower() not in seen:
+                seen.add(value.lower())
+                scored.append((score, c))
+
+        # Sort by score descending, take top results
+        scored.sort(key=lambda x: -x[0])
+        results = [
+            {"crid": c["crid"], "value": c[field], "name": c["name"],
+             "city": c["city"], "state": c["state"], "score": round(s, 2)}
+            for s, c in scored[:limit]
+        ]
+
+        return {"success": True, "field": field, "query": query, "count": len(results), "data": results}
 
     def lookup(self, crid: str) -> dict:
         crid = crid.upper()
@@ -32,14 +163,15 @@ class CustomerDB:
                     return {"success": True, "data": data}
         return {"success": False, "error": f"CRID {crid} not found"}
 
-    def search(self, state: str = None, city: str = None, min_moves: int = None, limit: int = 10) -> dict:
+    def search(self, state: str = None, city: str = None, min_moves: int = None, limit: int = None) -> dict:
         results = self.by_state.get(state.upper(), []) if state else self.customers
         if min_moves:
             results = [c for c in results if c["move_count"] >= min_moves]
         if city:
             city_lower = city.casefold()
             results = [c for c in results if city_lower in c["city"].casefold()]
-        return {"success": True, "total": len(results), "data": results[:min(limit, 100)]}
+        data = results[:limit] if limit else results
+        return {"success": True, "total": len(results), "data": data}
 
     def stats(self) -> dict:
         return {"success": True, "data": {s: len(c) for s, c in self.by_state.items()}, "total": len(self.customers)}

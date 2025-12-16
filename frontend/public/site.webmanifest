@@ -1,0 +1,21 @@
+{
+  "name": "USPS ICDA - Intelligent Customer Data Access",
+  "short_name": "ICDA",
+  "description": "Intelligent Customer Data Access Prototype by ECS",
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#004B87",
+  "background_color": "#0a1929",
+  "display": "standalone",
+  "start_url": "/"
+}

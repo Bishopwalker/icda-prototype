@@ -14,11 +14,12 @@ class Guardrails:
     __slots__ = ()
 
     # Pattern name, regex, message
+    # Patterns are designed to catch actual sensitive requests, not street names
     _RULES = [
-        ("pii", r"\b(ssn|social\s*security)\b", "SSN not accessible"),
-        ("financial", r"\b(credit\s*card|bank\s*account)\b", "Financial info not accessible"),
-        ("credentials", r"\b(password|secret|token)\b", "Credentials not accessible"),
-        ("offtopic", r"\b(weather|poem|story|joke)\b", "I only help with customer data queries"),
+        ("pii", r"\b(ssn|social\s*security(\s+number)?)\b", "SSN not accessible"),
+        ("financial", r"\b(credit\s*card|bank\s*account|routing\s*number)\b", "Financial info not accessible"),
+        ("credentials", r"\b(password|api[_\s]?key|auth[_\s]?token|secret[_\s]?key)\b", "Credentials not accessible"),
+        ("offtopic", r"^(what('?s| is) the weather|write (me )?a (poem|story|joke)|tell (me )?a joke)\b", "I only help with customer data queries"),
     ]
 
     _PATTERNS = {name: (re.compile(pattern, re.I), msg) for name, pattern, msg in _RULES}
