@@ -1,6 +1,22 @@
+# ============================================
+# ICDA Prototype - Docker Compose Configuration
+# ============================================
+# ONE COMMAND BUILD: docker-compose up --build
+# ONE COMMAND START: docker-compose up
+# ONE COMMAND STOP:  docker-compose down
+# FULL CLEANUP:      docker-compose down -v (removes volumes)
+#
+# Services:
+#   - icda:       Main application (FastAPI backend + React frontend)
+#   - redis:      Cache layer (required)
+#   - opensearch: Vector search and RAG (required)
+#   - mcp-*:      Optional MCP servers (use --profile mcp)
+# ============================================
+
 services:
   # ============================================
   # ICDA Main Application
+  # Multi-stage build: Frontend (Node) + Backend (Python)
   # ============================================
   icda:
     build:
@@ -11,13 +27,40 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # AWS Configuration (optional - for AI features)
       - AWS_REGION=${AWS_REGION:-us-east-1}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
+      - AWS_PROFILE=${AWS_PROFILE:-}
       - NOVA_MODEL=${NOVA_MODEL:-us.amazon.nova-micro-v1:0}
+      - TITAN_EMBED_MODEL=${TITAN_EMBED_MODEL:-amazon.titan-embed-text-v2:0}
+
+      # Infrastructure (required - using Docker service names)
       - REDIS_URL=redis://redis:6379
       - OPENSEARCH_HOST=http://opensearch:9200
+
+      # Index Hierarchy
+      - INDEX_MASTER=${INDEX_MASTER:-icda-master}
+      - INDEX_CODE=${INDEX_CODE:-icda-code}
+      - INDEX_KNOWLEDGE=${INDEX_KNOWLEDGE:-icda-knowledge}
+      - INDEX_CUSTOMERS=${INDEX_CUSTOMERS:-icda-customers}
+      - OPENSEARCH_INDEX=${OPENSEARCH_INDEX:-customers}
+
+      # Gemini Enforcer (optional)
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+      - GEMINI_CHUNK_THRESHOLD=${GEMINI_CHUNK_THRESHOLD:-0.6}
+      - GEMINI_QUERY_SAMPLE_RATE=${GEMINI_QUERY_SAMPLE_RATE:-0.1}
+      - GEMINI_VALIDATION_INTERVAL=${GEMINI_VALIDATION_INTERVAL:-6}
+
+      # Feature Flags
+      - ENABLE_FEDERATION=${ENABLE_FEDERATION:-true}
+      - ENABLE_GEMINI_ENFORCER=${ENABLE_GEMINI_ENFORCER:-true}
+      - ADMIN_ENABLED=${ADMIN_ENABLED:-true}
+
+      # Python settings
+      - PYTHONUNBUFFERED=1
     depends_on:
       redis:
         condition: service_healthy
@@ -32,6 +75,14 @@ services:
     restart: unless-stopped
     networks:
       - icda-network
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
 
   # ============================================
   # Redis Cache
@@ -43,14 +94,24 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 5s
     restart: unless-stopped
     networks:
       - icda-network
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          cpus: "0.1"
+          memory: 128M
 
   # ============================================
   # OpenSearch Vector Store
@@ -63,6 +124,14 @@ services:
       - plugins.security.disabled=true
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Admin123!
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
     ports:
       - "9200:9200"
       - "9600:9600"
@@ -77,6 +146,14 @@ services:
     restart: unless-stopped
     networks:
       - icda-network
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 1G
 
   # ============================================
   # MCP Server (stdio transport - for Claude CLI)
@@ -154,12 +231,23 @@ services:
     profiles:
       - mcp
 
+# ============================================
+# Networks
+# ============================================
 networks:
   icda-network:
     driver: bridge
+    name: icda-network
 
+# ============================================
+# Volumes (persistent data)
+# ============================================
 volumes:
   redis_data:
+    name: icda-redis-data
   opensearch_data:
+    name: icda-opensearch-data
   mcp_data:
+    name: icda-mcp-data
   mcp_knowledge_data:
+    name: icda-mcp-knowledge-data
