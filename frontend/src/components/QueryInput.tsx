@@ -10,13 +10,12 @@ import { alpha } from '@mui/material/styles';
 import {
   Send as SendIcon, Clear as ClearIcon, Add as AddIcon, UploadFile as UploadIcon,
   Close as CloseIcon, Download as DownloadIcon, DataObject as JsonIcon, TableChart as CsvIcon,
-  LocationOn as LocationIcon, Search as SearchIcon, VerifiedUser as ValidatorIcon,
+  LocationOn as LocationIcon, Search as SearchIcon,
 } from '@mui/icons-material';
 import { colors, borderRadius, transitions } from '../theme';
 import { downloadMessages, ALLOWED_FILE_EXTENSIONS } from '../utils';
 import api from '../services/api';
 import type { ChatMessage, AutocompleteItem } from '../types';
-import Validator from './Validator';
 
 interface QueryInputProps {
   onSend: (query: string, file?: File) => Promise<void>;
@@ -34,7 +33,6 @@ export const QueryInput: React.FC<QueryInputProps> = ({
   const [query, setQuery] = useState(initialQuery || '');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [downloadAnchor, setDownloadAnchor] = useState<HTMLElement | null>(null);
-  const [validatorOpen, setValidatorOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<AutocompleteItem[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -387,27 +385,6 @@ export const QueryInput: React.FC<QueryInputProps> = ({
             </Button>
           </Tooltip>
 
-          <Tooltip title="Validate addresses">
-            <Button
-              size="small"
-              startIcon={<ValidatorIcon />}
-              onClick={() => setValidatorOpen(true)}
-              disabled={loading}
-              aria-label="Validator"
-              sx={{
-                color: colors.success.light,
-                borderColor: alpha(colors.success.main, 0.5),
-                border: 1,
-                '&:hover': {
-                  backgroundColor: alpha(colors.success.main, 0.1),
-                  borderColor: colors.success.main,
-                },
-              }}
-            >
-              Validator
-            </Button>
-          </Tooltip>
-
           {messages.length > 0 && (
             <>
               <Tooltip title="Download chat results">
@@ -478,8 +455,6 @@ export const QueryInput: React.FC<QueryInputProps> = ({
           New Chat
         </Button>
       </Box>
-
-      <Validator open={validatorOpen} onClose={() => setValidatorOpen(false)} />
     </Box>
   );
 };
