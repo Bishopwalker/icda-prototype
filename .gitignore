@@ -40,3 +40,4 @@ chroma_db/
 
 # Local settings (user-specific)
 settings.local.json
+/customer_data.json
