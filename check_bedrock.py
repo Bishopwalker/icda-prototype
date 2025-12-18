@@ -1,6 +1,14 @@
 """Quick check for Bedrock access and available models"""
 import boto3
+from botocore.config import Config
 import json
+
+# Configure boto3 client with extended timeout
+BOTO_CONFIG = Config(
+    read_timeout=3600,
+    connect_timeout=60,
+    retries={'max_attempts': 3}
+)
 
 def check_bedrock():
     print("=" * 60)
@@ -46,7 +54,7 @@ def check_bedrock():
     print("Testing Bedrock Runtime Access:")
     print("-" * 60)
     
-    runtime = boto3.client('bedrock-runtime', region_name='us-east-1')
+    runtime = boto3.client('bedrock-runtime', region_name='us-east-1', config=BOTO_CONFIG)
     
     test_models = [
         'us.amazon.nova-micro-v1:0',

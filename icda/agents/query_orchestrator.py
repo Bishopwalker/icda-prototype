@@ -75,6 +75,7 @@ class QueryOrchestrator:
         address_orchestrator=None,
         session_store=None,
         guardrails=None,
+        gemini_enforcer=None,
         config: dict[str, Any] | None = None,
     ):
         """Initialize QueryOrchestrator with all agents.
@@ -88,6 +89,7 @@ class QueryOrchestrator:
             address_orchestrator: Optional address verification orchestrator.
             session_store: Optional session store for context.
             guardrails: Optional Guardrails for PII filtering.
+            gemini_enforcer: Optional GeminiEnforcer for AI-powered validation.
             config: Optional configuration overrides.
         """
         self._config = config or {}
@@ -101,10 +103,10 @@ class QueryOrchestrator:
             address_orchestrator=address_orchestrator,
         )
 
-        # Initialize all 8 agents
+        # Initialize all 7 core agents + 1 Gemini-powered enforcer
         # Each agent receives ONLY the context it needs (enforcer pattern)
         self._intent_agent = IntentAgent()
-        self._context_agent = ContextAgent(session_store=session_store)
+        self._context_agent = ContextAgent(session_manager=session_store)
         self._parser_agent = ParserAgent()
         self._resolver_agent = ResolverAgent(db=db, vector_index=vector_index)
         self._search_agent = SearchAgent(db=db, vector_index=vector_index)
@@ -114,10 +116,15 @@ class QueryOrchestrator:
             model=model,
             tool_registry=self._tool_registry,
         )
-        self._enforcer_agent = EnforcerAgent(guardrails=guardrails)
+        self._enforcer_agent = EnforcerAgent(
+            guardrails=guardrails,
+            gemini_enforcer=gemini_enforcer,
+        )
 
+        # Log initialization with Gemini status
+        gemini_status = "enabled" if (gemini_enforcer and gemini_enforcer.available) else "disabled"
         logger.info(
-            f"QueryOrchestrator initialized with {len(self._tool_registry.list_tools())} tools"
+            f"QueryOrchestrator initialized: {len(self._tool_registry.list_tools())} tools, Gemini enforcer: {gemini_status}"
         )
 
     @property
@@ -495,6 +502,7 @@ def create_query_orchestrator(
     address_orchestrator=None,
     session_store=None,
     guardrails=None,
+    gemini_enforcer=None,
 ) -> QueryOrchestrator:
     """Factory function to create a QueryOrchestrator.
 
@@ -507,6 +515,7 @@ def create_query_orchestrator(
         address_orchestrator: Optional address verification orchestrator.
         session_store: Optional session store for context.
         guardrails: Optional Guardrails for PII filtering.
+        gemini_enforcer: Optional GeminiEnforcer for AI-powered validation.
 
     Returns:
         Configured QueryOrchestrator instance.
@@ -520,4 +529,5 @@ def create_query_orchestrator(
         address_orchestrator=address_orchestrator,
         session_store=session_store,
         guardrails=guardrails,
+        gemini_enforcer=gemini_enforcer,
     )

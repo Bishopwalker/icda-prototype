@@ -13,7 +13,15 @@ import os
 from typing import Any
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError
+
+# Configure boto3 client with extended timeout for long-running Bedrock calls
+BOTO_CONFIG = Config(
+    read_timeout=3600,  # 1 hour timeout
+    connect_timeout=60,
+    retries={'max_attempts': 3}
+)
 
 from .models import (
     IntentResult,
@@ -76,7 +84,7 @@ If you need to call a tool, select the most appropriate one based on the query."
             return
 
         try:
-            self._client = boto3.client("bedrock-runtime", region_name=region)
+            self._client = boto3.client("bedrock-runtime", region_name=region, config=BOTO_CONFIG)
             self._available = True
             logger.info(f"NovaAgent: Connected ({model})")
         except NoCredentialsError:
@@ -196,31 +204,40 @@ If you need to call a tool, select the most appropriate one based on the query."
             knowledge: Knowledge context.
 
         Returns:
-            Context string for the prompt.
+            Context string for the prompt (compact format to stay under token limit).
         """
         parts = []
 
-        # Add search results context
+        # Add search results context - compact format to stay under token limits
         if search_result.results:
-            parts.append("CUSTOMER DATA:")
-            for i, customer in enumerate(search_result.results[:5], 1):
+            total = search_result.total_matches
+            shown = min(len(search_result.results), 10)  # Limit to 10 results
+            parts.append(f"CUSTOMER DATA ({shown} of {total} total):")
+
+            for i, customer in enumerate(search_result.results[:10], 1):
                 crid = customer.get("crid", "N/A")
                 name = customer.get("name", "N/A")
                 city = customer.get("city", "N/A")
                 state = customer.get("state", "N/A")
                 moves = customer.get("move_count", 0)
-                parts.append(f"  {i}. {crid}: {name} - {city}, {state} ({moves} moves)")
+                customer_type = customer.get("customer_type", "N/A")
 
-            if search_result.total_matches > 5:
-                parts.append(f"  ... and {search_result.total_matches - 5} more")
+                # Compact single-line format
+                parts.append(f"  {i}. {crid}: {name} - {customer_type}, {city}, {state} ({moves} moves)")
 
-        # Add knowledge context
+            if total > 10:
+                parts.append(f"  ... and {total - 10} more")
+
+        else:
+            parts.append("NO CUSTOMER DATA FOUND - inform the user no matches were found.")
+
+        # Add knowledge context (limited)
         if knowledge.relevant_chunks:
-            parts.append("\nRELEVANT DOCUMENTATION:")
-            for chunk in knowledge.relevant_chunks[:3]:
-                text = chunk.get("text", "")[:200]
+            parts.append("\nDOCUMENTATION:")
+            for chunk in knowledge.relevant_chunks[:2]:  # Limit to 2 chunks
+                text = chunk.get("text", "")[:150]  # Shorter text
                 source = chunk.get("source", "")
-                parts.append(f"  - {text}... (from {source})")
+                parts.append(f"  - {text}... ({source})")
 
         return "\n".join(parts) if parts else ""
 
@@ -323,22 +340,32 @@ If you need to call a tool, select the most appropriate one based on the query."
         Returns:
             NovaResponse with template-based text.
         """
-        # Generate response from search results
+        # Generate response from search results with COMPLETE customer data
         if search_result.results:
-            count = len(search_result.results)
             total = search_result.total_matches
+            shown = min(len(search_result.results), 10)
 
-            # Format results
-            lines = [f"Found {total} customer(s):"]
-            for customer in search_result.results[:5]:
+            # Format results with full customer details
+            lines = [f"Found {total} customer(s). Here are the top {shown}:\n"]
+            for i, customer in enumerate(search_result.results[:10], 1):
                 crid = customer.get("crid", "N/A")
                 name = customer.get("name", "N/A")
+                address = customer.get("address", "N/A")
                 city = customer.get("city", "N/A")
                 state = customer.get("state", "N/A")
-                lines.append(f"  - {crid}: {name} ({city}, {state})")
+                zip_code = customer.get("zip", "N/A")
+                moves = customer.get("move_count", 0)
+                status = customer.get("status", "N/A")
+                customer_type = customer.get("customer_type", "N/A")
 
-            if total > 5:
-                lines.append(f"  ... and {total - 5} more")
+                lines.append(f"{i}. **{name}** (CRID: {crid})")
+                lines.append(f"   Address: {address}")
+                lines.append(f"   Location: {city}, {state} {zip_code}")
+                lines.append(f"   Moves: {moves} | Status: {status} | Type: {customer_type}")
+                lines.append("")
+
+            if total > 10:
+                lines.append(f"... and {total - 10} more customers match your query.")
 
             return NovaResponse(
                 response_text="\n".join(lines),
@@ -346,16 +373,16 @@ If you need to call a tool, select the most appropriate one based on the query."
                 tool_results=[],
                 model_used="fallback",
                 tokens_used=0,
-                ai_confidence=0.5,
+                ai_confidence=0.7,
             )
 
         return NovaResponse(
-            response_text="AI features are not available. Please use direct search or autocomplete endpoints.",
+            response_text="No customers found matching your query. Try different search criteria or check the spelling.",
             tools_used=[],
             tool_results=[],
             model_used="fallback",
             tokens_used=0,
-            ai_confidence=0.1,
+            ai_confidence=0.5,
         )
 
     def _estimate_confidence(

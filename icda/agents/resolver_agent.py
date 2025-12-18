@@ -104,7 +104,8 @@ class ResolverAgent:
         for crid in crids:
             try:
                 result = self._db.lookup(crid)
-                if result.get("success") and result.get("customer"):
+                # Database returns "data" key, not "customer"
+                if result.get("success") and result.get("data"):
                     resolved.append(crid)
                 else:
                     unresolved.append(crid)
@@ -127,8 +128,9 @@ class ResolverAgent:
         for crid in crids:
             try:
                 result = self._db.lookup(crid)
-                if result.get("success") and result.get("customer"):
-                    customers.append(result["customer"])
+                # Database returns "data" key, not "customer"
+                if result.get("success") and result.get("data"):
+                    customers.append(result["data"])
             except Exception as e:
                 logger.warning(f"Failed to lookup customer {crid}: {e}")
         return customers

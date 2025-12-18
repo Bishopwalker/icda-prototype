@@ -168,8 +168,9 @@ class SearchAgent:
         for crid in resolved.resolved_crids:
             try:
                 result = self._db.lookup(crid)
-                if result.get("success") and result.get("customer"):
-                    results.append(result["customer"])
+                # Database returns "data" key, not "customer"
+                if result.get("success") and result.get("data"):
+                    results.append(result["data"])
             except Exception as e:
                 logger.warning(f"Lookup failed for {crid}: {e}")
 
@@ -196,8 +197,9 @@ class SearchAgent:
         )
 
         if result.get("success"):
-            customers = result.get("results", [])
-            return customers, {"filters_applied": filters}
+            # Database returns "data" key, not "results"
+            customers = result.get("data", [])
+            return customers, {"filters_applied": filters, "total": result.get("total", 0)}
 
         return [], {"error": result.get("error")}
 
@@ -225,8 +227,9 @@ class SearchAgent:
             if len(term) >= 3:
                 try:
                     fuzzy_result = self._db.autocomplete_fuzzy("name", term, limit=10)
-                    if fuzzy_result.get("results"):
-                        results.extend(fuzzy_result["results"])
+                    # Database returns "data" key, not "results"
+                    if fuzzy_result.get("data"):
+                        results.extend(fuzzy_result["data"])
                 except Exception as e:
                     logger.warning(f"Fuzzy search failed for '{term}': {e}")
 
@@ -331,7 +334,8 @@ class SearchAgent:
         result = self._db.search(limit=parsed.limit * 2)
 
         if result.get("success"):
-            return result.get("results", []), {"method": "basic", "no_filters": True}
+            # Database returns "data" key, not "results"
+            return result.get("data", []), {"method": "basic", "no_filters": True, "total": result.get("total", 0)}
 
         return [], {"error": result.get("error")}
 
