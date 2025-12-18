@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { GuardrailFlags, ChatMessage, QueryResponse } from '../types';
 import api from '../services/api';
@@ -18,6 +18,16 @@ export function useQuery(): UseQueryReturn {
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const sessionInitialized = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const addMessage = useCallback((message: Omit<ChatMessage, 'id' | 'timestamp'>) => {
     const newMessage: ChatMessage = {
@@ -31,6 +41,12 @@ export function useQuery(): UseQueryReturn {
 
   const sendQuery = useCallback(
     async (query: string, guardrails: GuardrailFlags, bypassCache: boolean = false, file?: File) => {
+      // Cancel any previous request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
       // Initialize session on first query if not already set
       let currentSessionId = sessionId;
       if (!currentSessionId && !sessionInitialized.current) {
@@ -100,6 +116,10 @@ export function useQuery(): UseQueryReturn {
           });
         }
       } catch (err) {
+        // Ignore abort errors - they're expected when cancelling requests
+        if (err instanceof Error && err.name === 'AbortError') {
+          return;
+        }
         const errorMessage = err instanceof Error ? err.message : 'Failed to send query';
         addMessage({
           type: 'error',
@@ -115,7 +135,9 @@ export function useQuery(): UseQueryReturn {
   const clearMessages = useCallback(() => {
     setMessages([]);
     if (sessionId) {
-      api.deleteSession(sessionId).catch(() => {});
+      api.deleteSession(sessionId).catch((err) => {
+        console.warn('Failed to delete session:', err);
+      });
     }
     setSessionId(null);
     sessionInitialized.current = false;
@@ -123,7 +145,9 @@ export function useQuery(): UseQueryReturn {
 
   const newSession = useCallback(() => {
     if (sessionId) {
-      api.deleteSession(sessionId).catch(() => {});
+      api.deleteSession(sessionId).catch((err) => {
+        console.warn('Failed to delete previous session:', err);
+      });
     }
     setSessionId(uuidv4());
     sessionInitialized.current = true;

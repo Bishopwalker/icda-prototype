@@ -4,7 +4,7 @@ import {
   Box, TextField, IconButton, Tooltip, FormControlLabel, Switch,
   Button, Chip, Menu, MenuItem, ListItemIcon, ListItemText,
   Paper, List, ListItem, ListItemButton, Typography,
-  InputAdornment, CircularProgress,
+  InputAdornment, CircularProgress, Snackbar, Alert,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import {
@@ -38,6 +38,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
   const [suggestions, setSuggestions] = useState<AutocompleteItem[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -132,7 +133,7 @@ export const QueryInput: React.FC<QueryInputProps> = ({
       if (ALLOWED_FILE_EXTENSIONS.includes(ext as typeof ALLOWED_FILE_EXTENSIONS[number])) {
         setSelectedFile(file);
       } else {
-        alert(`Only ${ALLOWED_FILE_EXTENSIONS.join(', ')} files supported`);
+        setFileError(`Only ${ALLOWED_FILE_EXTENSIONS.join(', ')} files are supported`);
       }
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -480,6 +481,22 @@ export const QueryInput: React.FC<QueryInputProps> = ({
       </Box>
 
       <Validator open={validatorOpen} onClose={() => setValidatorOpen(false)} />
+
+      <Snackbar
+        open={fileError !== null}
+        autoHideDuration={5000}
+        onClose={() => setFileError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setFileError(null)}
+          severity="error"
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {fileError}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { HealthStatus, CacheStats } from '../types';
 import api from '../services/api';
 
@@ -17,24 +17,43 @@ export function useHealth(pollInterval: number = 30000): UseHealthReturn {
   const [cacheStats, setCacheStats] = useState<CacheStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+
+  // Track mounted state
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const refreshHealth = useCallback(async () => {
     try {
       const data = await api.health();
-      setHealth(data);
-      setError(null);
-    } catch {
-      setError('Failed to fetch health status');
-      setHealth(null);
+      if (mountedRef.current) {
+        setHealth(data);
+        setError(null);
+      }
+    } catch (err) {
+      if (mountedRef.current) {
+        console.warn('Failed to fetch health status:', err);
+        setError('Failed to fetch health status');
+        setHealth(null);
+      }
     }
   }, []);
 
   const refreshCacheStats = useCallback(async () => {
     try {
       const data = await api.cacheStats();
-      setCacheStats(data);
-    } catch {
-      setCacheStats(null);
+      if (mountedRef.current) {
+        setCacheStats(data);
+      }
+    } catch (err) {
+      if (mountedRef.current) {
+        console.warn('Failed to fetch cache stats:', err);
+        setCacheStats(null);
+      }
     }
   }, []);
 
@@ -42,15 +61,22 @@ export function useHealth(pollInterval: number = 30000): UseHealthReturn {
     try {
       await api.clearCache();
       await refreshCacheStats();
-    } catch {
-      setError('Failed to clear cache');
+    } catch (err) {
+      if (mountedRef.current) {
+        console.error('Failed to clear cache:', err);
+        setError('Failed to clear cache');
+      }
     }
   }, [refreshCacheStats]);
 
   const fetchAll = useCallback(async () => {
-    setLoading(true);
+    if (mountedRef.current) {
+      setLoading(true);
+    }
     await Promise.all([refreshHealth(), refreshCacheStats()]);
-    setLoading(false);
+    if (mountedRef.current) {
+      setLoading(false);
+    }
   }, [refreshHealth, refreshCacheStats]);
 
   useEffect(() => {

@@ -35,6 +35,7 @@ import {
 import { useDropzone } from 'react-dropzone';
 import { api } from '../services/api';
 import type { KnowledgeDocument, KnowledgeStats } from '../types';
+import ConfirmDialog from './ConfirmDialog';
 
 interface KnowledgeUploadModalProps {
   open: boolean;
@@ -69,6 +70,9 @@ export const KnowledgeUploadModal: React.FC<KnowledgeUploadModalProps> = ({
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [stats, setStats] = useState<KnowledgeStats | null>(null);
   const [loadingDocs, setLoadingDocs] = useState(false);
+
+  // Confirm dialog state
+  const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
 
   // Dropzone
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -152,15 +156,25 @@ export const KnowledgeUploadModal: React.FC<KnowledgeUploadModalProps> = ({
     }
   };
 
-  const handleDelete = async (docId: string) => {
-    if (!window.confirm('Delete this document?')) return;
+  const handleDeleteClick = (docId: string) => {
+    setDeleteDocId(docId);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteDocId) return;
 
     try {
-      await api.knowledgeDelete(docId);
+      await api.knowledgeDelete(deleteDocId);
       loadDocuments();
     } catch {
       setError('Failed to delete document');
+    } finally {
+      setDeleteDocId(null);
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDocId(null);
   };
 
   // Load documents when tab changes to "Manage"
@@ -186,7 +200,7 @@ export const KnowledgeUploadModal: React.FC<KnowledgeUploadModalProps> = ({
           <DocIcon color="primary" />
           <Typography variant="h6">Knowledge Base</Typography>
         </Box>
-        <IconButton onClick={handleClose} size="small">
+        <IconButton onClick={handleClose} size="small" aria-label="Close dialog">
           <CloseIcon />
         </IconButton>
       </DialogTitle>
@@ -367,7 +381,7 @@ export const KnowledgeUploadModal: React.FC<KnowledgeUploadModalProps> = ({
                       <ListItemSecondaryAction>
                         <IconButton
                           edge="end"
-                          onClick={() => handleDelete(doc.doc_id)}
+                          onClick={() => handleDeleteClick(doc.doc_id)}
                           size="small"
                           color="error"
                         >
@@ -397,6 +411,17 @@ export const KnowledgeUploadModal: React.FC<KnowledgeUploadModalProps> = ({
           </Button>
         )}
       </DialogActions>
+
+      <ConfirmDialog
+        open={deleteDocId !== null}
+        title="Delete Document"
+        message="Are you sure you want to delete this document? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmColor="error"
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
     </Dialog>
   );
 };
