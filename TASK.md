@@ -53,6 +53,15 @@
 ## ✅ Completed Tasks
 
 ### December 2025
+- [x] **Router Architecture Refactor** (2025-12-21)
+  - Simplified `router.py` to be a thin gateway to orchestrator
+  - Removed duplicate routing logic (vector_index.find_route vs IntentAgent)
+  - All queries now go through 8-agent orchestrator pipeline
+  - Implemented parallel session + cache fetch (was sequential)
+  - Removed direct `db.execute()` path - all queries get quality gates
+  - Preserved response structure for backward compatibility
+  - **Impact:** Consistent quality enforcement, ~2x faster initial routing, cleaner architecture
+
 - [x] **Query Pipeline Response Fixes** (2025-12-18)
   - Fixed database key mismatch ("results" vs "data") in SearchAgent
   - Fixed database key mismatch in ResolverAgent (_lookup_customers)
