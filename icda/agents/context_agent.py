@@ -146,9 +146,9 @@ class ContextAgent:
 
         try:
             session = await self._session_manager.get(session_id)
-            if session and "history" in session:
-                # Return last 10 messages for context
-                return session["history"][-10:]
+            if session and session.messages:
+                # Return last 10 messages in Bedrock format for context
+                return session.get_history(max_messages=10)
             return []
         except Exception as e:
             logger.warning(f"Failed to get session history: {e}")

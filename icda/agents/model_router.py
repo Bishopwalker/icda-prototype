@@ -128,12 +128,13 @@ class ModelRouter:
         if self._has_sql_complexity(intent, parsed):
             reasons.append("sql_complexity")
 
-        # If any Pro reasons found, use Pro model
+        # If any Pro reasons found, use Lite model (Pro may not be available)
+        # This is a fallback - Pro requires special AWS access
         if reasons:
-            logger.info(f"ModelRouter: Nova Pro selected - {'; '.join(reasons)}")
+            logger.info(f"ModelRouter: Nova Lite selected (Pro triggers) - {'; '.join(reasons)}")
             return ModelRoutingDecision(
-                model_id=self._pro_model,
-                model_tier=ModelTier.PRO,
+                model_id=self._lite_model,
+                model_tier=ModelTier.LITE,
                 reason="; ".join(reasons),
                 confidence_factor=intent.confidence,
             )
@@ -160,12 +161,12 @@ class ModelRouter:
                 confidence_factor=intent.confidence,
             )
 
-        # Default: Simple queries use Micro
+        # Default: Simple queries use Lite (Micro has content filter issues)
         reason = "standard_complexity"
-        logger.info(f"ModelRouter: Nova Micro selected - {reason}")
+        logger.info(f"ModelRouter: Nova Lite selected - {reason}")
         return ModelRoutingDecision(
-            model_id=self._micro_model,
-            model_tier=ModelTier.MICRO,
+            model_id=self._lite_model,
+            model_tier=ModelTier.LITE,
             reason=reason,
             confidence_factor=intent.confidence,
         )

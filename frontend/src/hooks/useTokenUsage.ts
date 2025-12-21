@@ -2,9 +2,9 @@ import { useState, useCallback } from 'react';
 import type { TokenUsage } from '../types';
 
 /**
- * Default context limit for Nova models.
+ * Default context limit for Nova Lite model.
  */
-const DEFAULT_CONTEXT_LIMIT = 200000;
+const DEFAULT_CONTEXT_LIMIT = 300000;
 
 /**
  * Initial token usage state.

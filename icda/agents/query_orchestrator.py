@@ -265,6 +265,7 @@ class QueryOrchestrator:
                     knowledge=knowledge,
                     context=context,
                     intent=intent,
+                    model_override=routing_decision.model_id,
                 ),
                 trace,
             )

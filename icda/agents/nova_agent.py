@@ -44,23 +44,10 @@ class NovaAgent:
     """
     __slots__ = ("_client", "_model", "_tool_registry", "_available")
 
-    SYSTEM_PROMPT = """You are ICDA, an intelligent customer data assistant. Be concise, accurate, and helpful.
-
-CAPABILITIES:
-- Look up customers by CRID
-- Search customers by state, city, or move count
-- Provide statistics and aggregations
-- Answer questions about customer data
-
-GUIDELINES:
-- Interpret queries flexibly (e.g., "Nevada folks" = state NV, "high movers" = min_move_count 3+)
-- Use the provided context and search results
-- Never reveal SSN, financial info, or health data
-- Be direct and concise in responses
-- Use conversation history for context in follow-up questions
-
-When you have search results or data context, use that information to answer the query.
-If you need to call a tool, select the most appropriate one based on the query."""
+    # Compact system prompt to reduce token usage
+    SYSTEM_PROMPT = """You are ICDA, a customer data assistant. Be concise and accurate.
+Use provided context to answer. Never reveal SSN, financial, or health data.
+Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
 
     def __init__(
         self,
@@ -106,6 +93,7 @@ If you need to call a tool, select the most appropriate one based on the query."
         knowledge: KnowledgeContext,
         context: QueryContext,
         intent: IntentResult,
+        model_override: str | None = None,
     ) -> NovaResponse:
         """Generate AI response with dynamic tools.
 
@@ -115,6 +103,7 @@ If you need to call a tool, select the most appropriate one based on the query."
             knowledge: Context from KnowledgeAgent.
             context: Session context from ContextAgent.
             intent: Intent classification.
+            model_override: Optional model ID to use instead of default.
 
         Returns:
             NovaResponse with generated text.
@@ -122,33 +111,42 @@ If you need to call a tool, select the most appropriate one based on the query."
         if not self._available:
             return self._fallback_response(query, search_result, knowledge)
 
-        try:
-            # Build messages with history
-            messages = self._build_messages(query, context)
+        # Use override model if provided
+        model_to_use = model_override or self._model
 
-            # Build context from search and knowledge
+        try:
+            # Build messages WITHOUT history first to reduce tokens
+            messages = [{"role": "user", "content": [{"text": query}]}]
+
+            # Build minimal context from search (no knowledge)
             rag_context = self._build_context(search_result, knowledge)
 
-            # Get tools for this intent
-            tools = self._tool_registry.get_tools_for_intent(intent)
+            # Skip tools to reduce complexity and token usage
+            tools = []
 
             # Call Nova - now returns token_usage
             response, tools_used, tool_results, token_usage = await self._converse(
-                messages, tools, rag_context
+                messages, tools, rag_context, model_to_use
             )
 
             return NovaResponse(
                 response_text=response,
                 tools_used=tools_used,
                 tool_results=tool_results,
-                model_used=self._model,
+                model_used=model_to_use,
                 token_usage=token_usage,
                 ai_confidence=self._estimate_confidence(response, tools_used),
             )
 
         except ClientError as e:
             error_msg = e.response.get("Error", {}).get("Message", str(e))
-            logger.error(f"Nova error: {error_msg}")
+            logger.error(f"Nova error ({model_to_use}): {error_msg}")
+
+            # Check for token limit errors
+            if "token" in error_msg.lower() or "exceeded" in error_msg.lower():
+                logger.warning("Token limit exceeded - using fallback response")
+                return self._fallback_response(query, search_result, knowledge)
+
             if "Access" in error_msg or "credentials" in error_msg.lower():
                 self._available = False
             return self._fallback_response(query, search_result, knowledge)
@@ -194,6 +192,9 @@ If you need to call a tool, select the most appropriate one based on the query."
 
         return messages
 
+    # Maximum results to include in context (reduces token usage)
+    MAX_CONTEXT_RESULTS = 3
+
     def _build_context(
         self,
         search_result: SearchResult,
@@ -210,37 +211,26 @@ If you need to call a tool, select the most appropriate one based on the query."
         """
         parts = []
 
-        # Add search results context - compact format to stay under token limits
+        # Add search results context - ultra-compact format to stay under token limits
         if search_result.results:
             total = search_result.total_matches
-            shown = min(len(search_result.results), 5)  # Limit to 5 results to save tokens
-            parts.append(f"CUSTOMER DATA ({shown} of {total} total):")
+            shown = min(len(search_result.results), self.MAX_CONTEXT_RESULTS)
+            parts.append(f"DATA ({shown}/{total}):")
 
-            for i, customer in enumerate(search_result.results[:5], 1):
+            for i, customer in enumerate(search_result.results[:self.MAX_CONTEXT_RESULTS], 1):
                 crid = customer.get("crid", "N/A")
                 name = customer.get("name", "N/A")
                 city = customer.get("city", "N/A")
                 state = customer.get("state", "N/A")
-                moves = customer.get("move_count", 0)
-                customer_type = customer.get("customer_type", "N/A")
+                # Ultra-compact: CRID: Name - City, ST
+                parts.append(f"{i}. {crid}: {name} - {city}, {state}")
 
-                # Compact single-line format
-                parts.append(f"  {i}. {crid}: {name} - {customer_type}, {city}, {state} ({moves} moves)")
-
-            if total > 5:
-                parts.append(f"  ... and {total - 5} more")
-
+            if total > self.MAX_CONTEXT_RESULTS:
+                parts.append(f"...+{total - self.MAX_CONTEXT_RESULTS} more")
         else:
-            parts.append("NO CUSTOMER DATA FOUND - inform the user no matches were found.")
+            parts.append("NO DATA FOUND")
 
-        # Add knowledge context (limited)
-        if knowledge.relevant_chunks:
-            parts.append("\nDOCUMENTATION:")
-            for chunk in knowledge.relevant_chunks[:2]:  # Limit to 2 chunks
-                text = chunk.get("text", "")[:150]  # Shorter text
-                source = chunk.get("source", "")
-                parts.append(f"  - {text}... ({source})")
-
+        # Skip knowledge context to reduce tokens (search results are primary)
         return "\n".join(parts) if parts else ""
 
     async def _converse(
@@ -248,6 +238,7 @@ If you need to call a tool, select the most appropriate one based on the query."
         messages: list[dict],
         tools: list[dict],
         context: str,
+        model_id: str | None = None,
     ) -> tuple[str, list[str], list[dict], TokenUsage]:
         """Call Bedrock converse API.
 
@@ -255,10 +246,13 @@ If you need to call a tool, select the most appropriate one based on the query."
             messages: Conversation messages.
             tools: Tool definitions.
             context: RAG context.
+            model_id: Optional model ID override.
 
         Returns:
             Tuple of (response_text, tools_used, tool_results, token_usage).
         """
+        model_to_use = model_id or self._model
+
         # Build system prompt with context
         system_prompts = [{"text": self.SYSTEM_PROMPT}]
         if context:
@@ -268,7 +262,7 @@ If you need to call a tool, select the most appropriate one based on the query."
         tool_config = {"tools": tools, "toolChoice": {"auto": {}}} if tools else None
 
         response = self._client.converse(
-            modelId=self._model,
+            modelId=model_to_use,
             messages=messages,
             system=system_prompts,
             toolConfig=tool_config,
@@ -315,7 +309,7 @@ If you need to call a tool, select the most appropriate one based on the query."
             ]
 
             follow_response = self._client.converse(
-                modelId=self._model,
+                modelId=model_to_use,
                 messages=follow_messages,
                 system=system_prompts,
                 toolConfig=tool_config,

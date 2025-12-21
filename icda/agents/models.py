@@ -75,7 +75,7 @@ class TokenUsage:
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
-    context_limit: int = 200000
+    context_limit: int = 300000  # Nova Lite context window
 
     def __add__(self, other: "TokenUsage") -> "TokenUsage":
         """Allow aggregation of token usage across multiple calls."""

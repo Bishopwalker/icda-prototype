@@ -31,12 +31,13 @@ def _parse_int(value: str, default: int) -> int:
 class Config:
     # ==================== AWS (optional - empty = LITE MODE) ====================
     aws_region: str = field(default_factory=lambda: getenv("AWS_REGION", "us-east-1"))
-    nova_model: str = field(default_factory=lambda: getenv("NOVA_MODEL", "us.amazon.nova-micro-v1:0"))
+    # Default to Nova Lite - Micro has stricter content filters that block customer data
+    nova_model: str = field(default_factory=lambda: getenv("NOVA_MODEL", "us.amazon.nova-lite-v1:0"))
     titan_embed_model: str = field(default_factory=lambda: getenv("TITAN_EMBED_MODEL", "amazon.titan-embed-text-v2:0"))
     embed_dimensions: int = 1024
 
     # ==================== Nova Model Routing (NEW) ====================
-    # Nova Lite - for medium complexity queries
+    # Nova Lite - default for all queries (Micro has content filter issues)
     nova_lite_model: str = field(default_factory=lambda: getenv("NOVA_LITE_MODEL", "us.amazon.nova-lite-v1:0"))
     # Nova Pro - for complex queries, low confidence, multi-part queries
     nova_pro_model: str = field(default_factory=lambda: getenv("NOVA_PRO_MODEL", "us.amazon.nova-pro-v1:0"))

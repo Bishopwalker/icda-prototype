@@ -157,13 +157,13 @@ async def auto_index_knowledge_documents(knowledge_manager: KnowledgeManager) ->
             )
 
             if result.get("success"):
-                print(f"  ✓ Indexed: {filename} ({result.get('chunks_indexed', 0)} chunks)")
+                print(f"  [OK] Indexed: {filename} ({result.get('chunks_indexed', 0)} chunks)")
                 indexed += 1
             else:
-                print(f"  ✗ Failed: {filename} - {result.get('error')}")
+                print(f"  [FAIL] Failed: {filename} - {result.get('error')}")
                 failed += 1
         except Exception as e:
-            print(f"  ✗ Error: {filename} - {e}")
+            print(f"  [ERROR] Error: {filename} - {e}")
             failed += 1
 
     return {"indexed": indexed, "skipped": skipped, "failed": failed}
@@ -390,12 +390,13 @@ class QueryRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=500)
     bypass_cache: bool = False
     guardrails: GuardrailSettings | None = None
+    session_id: str | None = None  # For conversation continuity
 
 
 @app.post("/api/query")
 async def query(req: QueryRequest):
     guards = req.guardrails.model_dump() if req.guardrails else None
-    return await _router.route(req.query, req.bypass_cache, guards)
+    return await _router.route(req.query, req.bypass_cache, guards, req.session_id)
 
 
 @app.get("/api/query/download/{token}")

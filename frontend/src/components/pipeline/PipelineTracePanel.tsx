@@ -120,8 +120,15 @@ const formatTime = (ms: number): string => {
 const PipelineStageRow: React.FC<{ stage: PipelineStage }> = ({
   stage,
 }) => {
-  const agentConfig = AGENT_CONFIG[stage.agent];
-  const statusConfig = STATUS_CONFIG[stage.status];
+  const agentConfig = AGENT_CONFIG[stage.agent as PipelineAgentType];
+  const statusConfig = STATUS_CONFIG[stage.status] || STATUS_CONFIG.pending;
+  
+  // Guard against unknown agent types
+  if (!agentConfig) {
+    console.warn(`Unknown pipeline agent type: ${stage.agent}`);
+    return null;
+  }
+  
   const AgentIcon = agentConfig.icon;
   const StatusIcon = statusConfig.icon;
 

@@ -218,7 +218,7 @@ QUERY INTERPRETATION:
             session_id: Optional session ID.
 
         Returns:
-            dict with response and metadata.
+            dict with response and enhanced metadata (token_usage, trace, pagination).
         """
         try:
             result = await self._orchestrator.process(
@@ -227,7 +227,7 @@ QUERY INTERPRETATION:
                 trace_enabled=True,
             )
 
-            return {
+            response_dict = {
                 "success": result.success,
                 "response": result.response,
                 "tool": ", ".join(result.tools_used) if result.tools_used else None,
@@ -236,6 +236,20 @@ QUERY INTERPRETATION:
                 "latency_ms": result.latency_ms,
                 "metadata": result.metadata,
             }
+
+            # Add enhanced pipeline data
+            if result.token_usage:
+                response_dict["token_usage"] = result.token_usage
+            if result.trace:
+                response_dict["trace"] = result.trace
+            if result.pagination:
+                response_dict["pagination"] = result.pagination
+            if result.model_used:
+                response_dict["model_used"] = result.model_used
+            if result.results:
+                response_dict["results"] = result.results
+
+            return response_dict
 
         except Exception as e:
             logger.error(f"Orchestrator query failed: {e}", exc_info=True)
