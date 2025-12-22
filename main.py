@@ -15,7 +15,7 @@ load_dotenv()  # Must be before importing config
 
 from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -1377,6 +1377,18 @@ frontend_index = frontend_dist / "index.html"
 # Mount static assets BEFORE catch-all routes
 if frontend_dist.exists() and (frontend_dist / "assets").exists():
     app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="assets")
+
+# Serve site.webmanifest from dist if present, otherwise fall back to frontend/public for development
+@app.get("/site.webmanifest")
+async def site_manifest():
+    candidates = [
+        frontend_dist / "site.webmanifest",
+        BASE_DIR / "frontend" / "public" / "site.webmanifest",
+    ]
+    for p in candidates:
+        if p.exists():
+            return FileResponse(p)
+    return JSONResponse(status_code=404, content={"error": "site.webmanifest not found"})
 
 
 @app.get("/", response_class=HTMLResponse)
