@@ -66,7 +66,9 @@ class SearchAgent:
         # This prevents searching for states that don't exist and
         # returns helpful alternatives to the user
         # ============================================================
+        print(f"[DEBUG] SearchAgent.search: expanded_scope={resolved.expanded_scope}")
         if resolved.expanded_scope.get("state_valid") is False:
+            print(f"[DEBUG] SearchAgent.search: STATE NOT VALID - returning state_not_available response")
             state_info = resolved.expanded_scope
             # Build state counts dict from available_states_with_counts list
             state_counts_dict = {}
@@ -112,6 +114,24 @@ class SearchAgent:
                 strategy_results, strategy_meta = await self._execute_strategy(
                     strategy, parsed, resolved, intent
                 )
+
+                # CRITICAL FIX: Check for state_not_available error BEFORE trying next strategy
+                # This prevents fallback to basic_search which would return random unfiltered results
+                if strategy_meta.get("error") == "state_not_available":
+                    logger.info(f"State not available - stopping fallback chain at {strategy}")
+                    print(f"[DEBUG] SearchAgent: state_not_available detected in {strategy}, stopping fallbacks")
+                    # Return empty results with state info - don't try more strategies
+                    return SearchResult(
+                        strategy_used=SearchStrategy.KEYWORD,
+                        results=[],
+                        total_matches=0,
+                        search_metadata={"state_not_available": True, "strategy": strategy},
+                        alternatives_tried=alternatives_tried,
+                        search_confidence=0.0,
+                        state_not_available=True,
+                        requested_state=parsed.filters.get("state"),
+                        suggestion=strategy_meta.get("message", f"Requested state not in database"),
+                    )
 
                 if strategy_results:
                     results = strategy_results
@@ -233,7 +253,18 @@ class SearchAgent:
             customers = result.get("data", [])
             return customers, {"filters_applied": filters, "total": result.get("total", 0)}
 
-        return [], {"error": result.get("error")}
+        # CRITICAL FIX: Propagate state_not_available error with full details
+        # This allows the fallback loop to stop instead of trying basic_search
+        error = result.get("error")
+        if error == "state_not_available":
+            return [], {
+                "error": "state_not_available",
+                "message": result.get("message", "Requested state not in database"),
+                "requested_state": result.get("requested_state"),
+                "available_states": result.get("available_states"),
+            }
+
+        return [], {"error": error}
 
     async def _fuzzy_search(
         self,
@@ -297,15 +328,28 @@ class SearchAgent:
             return [], {"error": "Semantic customer search not implemented"}
 
         try:
-            state_filter = parsed.filters.get("state")
+            # Build filters dict for vector search (correct parameter name)
+            filters = {}
+            if parsed.filters.get("state"):
+                filters["state"] = parsed.filters["state"]
+            if parsed.filters.get("city"):
+                filters["city"] = parsed.filters["city"]
+
             results = await self._vector_index.search_customers_semantic(
                 parsed.normalized_query,
                 limit=parsed.limit * 2,
-                state_filter=state_filter,
+                filters=filters if filters else None,
             )
 
-            if isinstance(results, list):
-                return results, {"method": "semantic", "state_filter": state_filter}
+            # Vector search returns dict with "success" and "data" keys, not a list
+            if isinstance(results, dict):
+                if results.get("success"):
+                    return results.get("data", []), {"method": "semantic", "filters": filters}
+                else:
+                    # Check for state_not_available error
+                    if results.get("error") == "state_not_available":
+                        return [], {"error": "state_not_available", "message": results.get("message")}
+                    return [], {"error": results.get("error", "Semantic search failed")}
 
             return [], {"error": "Invalid semantic search response"}
 
@@ -334,15 +378,28 @@ class SearchAgent:
             return [], {"error": "Hybrid customer search not implemented"}
 
         try:
-            state_filter = parsed.filters.get("state")
+            # Build filters dict for vector search (correct parameter name)
+            filters = {}
+            if parsed.filters.get("state"):
+                filters["state"] = parsed.filters["state"]
+            if parsed.filters.get("city"):
+                filters["city"] = parsed.filters["city"]
+
             results = await self._vector_index.search_customers_hybrid(
                 parsed.normalized_query,
                 limit=parsed.limit * 2,
-                state_filter=state_filter,
+                filters=filters if filters else None,
             )
 
-            if isinstance(results, list):
-                return results, {"method": "hybrid", "state_filter": state_filter}
+            # Vector search returns dict with "success" and "data" keys, not a list
+            if isinstance(results, dict):
+                if results.get("success"):
+                    return results.get("data", []), {"method": "hybrid", "filters": filters}
+                else:
+                    # Check for state_not_available error
+                    if results.get("error") == "state_not_available":
+                        return [], {"error": "state_not_available", "message": results.get("message")}
+                    return [], {"error": results.get("error", "Hybrid search failed")}
 
             return [], {"error": "Invalid hybrid search response"}
 

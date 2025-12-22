@@ -44,9 +44,16 @@ class NovaAgent:
     """
     __slots__ = ("_client", "_model", "_tool_registry", "_available")
 
-    # Compact system prompt to reduce token usage
+    # System prompt emphasizing factual accuracy to prevent hallucination
     SYSTEM_PROMPT = """You are ICDA, a customer data assistant. Be concise and accurate.
-Use provided context to answer. Never reveal SSN, financial, or health data.
+
+CRITICAL RULES:
+1. ONLY use data from the provided CONTEXT - NEVER invent or hallucinate data
+2. If no data matches the query, say "No matching data found" - do NOT make up results
+3. If a state/location has no data, clearly inform the user instead of showing unrelated data
+4. Never reveal SSN, financial, or health data
+5. Maintain conversation context - reference prior exchanges when relevant
+
 Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
 
     def __init__(
@@ -123,8 +130,9 @@ Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
         model_to_use = model_override or self._model
 
         try:
-            # Build messages WITHOUT history first to reduce tokens
-            messages = [{"role": "user", "content": [{"text": query}]}]
+            # CRITICAL FIX: Include conversation history for context continuity
+            # This ensures the AI has complete conversation memory
+            messages = self._build_messages(query, context)
 
             # Build minimal context from search (no knowledge)
             rag_context = self._build_context(search_result, knowledge)
@@ -163,12 +171,15 @@ Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
             logger.error(f"NovaAgent error: {e}")
             return self._fallback_response(query, search_result, knowledge)
 
+    # Maximum conversation history messages to include (pairs = N/2 turns)
+    MAX_HISTORY_MESSAGES = 6  # 3 turns of conversation for better memory
+
     def _build_messages(
         self,
         query: str,
         context: QueryContext,
     ) -> list[dict[str, Any]]:
-        """Build message list with history.
+        """Build message list with conversation history for context continuity.
 
         Args:
             query: Current query.
@@ -180,8 +191,9 @@ Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
         messages = []
 
         # Add relevant history (filter to text-only, limit to save tokens)
+        # Include more history for better conversation memory
         if context.session_history:
-            for msg in context.session_history[-2:]:  # Last 2 messages only
+            for msg in context.session_history[-self.MAX_HISTORY_MESSAGES:]:
                 role = msg.get("role")
                 content = msg.get("content", [])
 

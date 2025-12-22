@@ -57,9 +57,20 @@ class ResolverAgent:
         unresolved = []
         fallback_strategies = []
         expanded_scope = {}
-        
-        # Validate requested state exists in database
+
+        # CRITICAL: Validate requested state FIRST before determining fallbacks
+        # This prevents hallucinated results for states not in database
         state_validation = self._validate_state(parsed)
+
+        # Expand scope for multi-state or ambiguous queries
+        expanded_scope = self._expand_scope(parsed, context)
+
+        # Add state validation info to expanded_scope BEFORE determining fallbacks
+        if state_validation:
+            expanded_scope.update(state_validation)
+            if not state_validation.get("state_valid", True):
+                unresolved.append(f"state:{state_validation.get('requested_state')}")
+                print(f"[DEBUG] ResolverAgent: Invalid state detected - clearing fallback strategies")
 
         # Resolve CRIDs
         if parsed.entities.get("crids"):
@@ -72,17 +83,15 @@ class ResolverAgent:
             if resolved_crids:
                 resolved_customers = await self._lookup_customers(resolved_crids)
 
-        # Determine fallback strategies based on what we have
-        fallback_strategies = self._determine_fallbacks(parsed, resolved_crids)
-
-        # Expand scope for multi-state or ambiguous queries
-        expanded_scope = self._expand_scope(parsed, context)
-        
-        # Add state validation info to expanded_scope
-        if state_validation:
-            expanded_scope.update(state_validation)
-            if not state_validation.get("state_valid", True):
-                unresolved.append(f"state:{state_validation.get('requested_state')}")
+        # CRITICAL FIX: Don't provide fallback strategies if state is invalid
+        # This forces search agent to return "state not available" instead of random results
+        if state_validation and not state_validation.get("state_valid", True):
+            # No fallback strategies for invalid state - let search agent handle gracefully
+            fallback_strategies = []
+            print(f"[DEBUG] ResolverAgent: No fallback strategies - state is invalid")
+        else:
+            # Determine fallback strategies based on what we have
+            fallback_strategies = self._determine_fallbacks(parsed, resolved_crids)
 
         # Calculate resolution confidence
         confidence = self._calculate_confidence(
@@ -108,17 +117,22 @@ class ResolverAgent:
             Dict with validation info or None if no state filter.
         """
         requested_state = parsed.filters.get("state")
+        print(f"[DEBUG] ResolverAgent._validate_state: requested_state={requested_state}")
         if not requested_state:
             return None
 
         # Get available states from database
         available_states = set(self._db.by_state.keys())
+        print(f"[DEBUG] ResolverAgent._validate_state: available_states={available_states}")
         
         if requested_state.upper() in available_states:
+            print(f"[DEBUG] ResolverAgent._validate_state: state {requested_state} IS VALID")
             return {
                 "state_valid": True,
                 "requested_state": requested_state.upper(),
             }
+        
+        print(f"[DEBUG] ResolverAgent._validate_state: state {requested_state} NOT IN DATABASE!")
         
         # State not found - provide helpful alternatives
         # Get states with customer counts, sorted by count descending
