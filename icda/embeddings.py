@@ -18,15 +18,16 @@ class EmbeddingClient:
         self.client = None
         self.available = False
 
-        # Check if AWS credentials are configured
-        if not os.environ.get("AWS_ACCESS_KEY_ID") and not os.environ.get("AWS_PROFILE"):
-            print("Embeddings: No AWS credentials - running in LITE MODE (no semantic search)")
-            return
-
+        # Try to connect using boto3's default credential chain
+        # This supports: env vars, AWS profile, IAM role, SSO, instance profile, etc.
         try:
             self.client = boto3.client("bedrock-runtime", region_name=region)
-            # Quick test to verify credentials work
-            self.client.meta.service_model
+            # Verify we have valid credentials by checking session
+            session = boto3.Session()
+            creds = session.get_credentials()
+            if creds is None:
+                print("Embeddings: No AWS credentials found - running in LITE MODE (no semantic search)")
+                return
             self.available = True
             print(f"Embeddings: Titan connected ({model})")
         except NoCredentialsError:

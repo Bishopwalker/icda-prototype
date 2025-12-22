@@ -30,6 +30,9 @@ services:
     volumes:
       # Mount AWS credentials from host (enables "just works" with aws configure)
       - ~/.aws:/root/.aws:ro
+      # DEV MODE: Mount source code for live reload without rebuild
+      - ./icda:/app/icda:ro
+      - ./main.py:/app/main.py:ro
     environment:
       # AWS Configuration - reads from mounted ~/.aws or env vars
       - AWS_REGION=${AWS_REGION:-us-east-1}

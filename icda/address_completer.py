@@ -100,14 +100,14 @@ Respond with JSON only:
         self._client = None
         self.available = False
 
-        # Check if AWS credentials are configured
-        if not os.environ.get("AWS_ACCESS_KEY_ID") and not os.environ.get("AWS_PROFILE"):
-            logger.info("NovaAddressCompleter: No AWS credentials - using fallback mode")
-            return
-
+        # Check if AWS credentials are available (supports default credential chain)
         try:
             import boto3
             from botocore.exceptions import NoCredentialsError
+            session = boto3.Session()
+            if session.get_credentials() is None:
+                logger.info("NovaAddressCompleter: No AWS credentials - using fallback mode")
+                return
             self._client = boto3.client("bedrock-runtime", region_name=region)
             self.available = True
             logger.info(f"NovaAddressCompleter initialized with model {model_id}")

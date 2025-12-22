@@ -240,11 +240,13 @@ class ParserAgent:
         """
         filters: dict[str, Any] = {}
         query_lower = query.lower()
+        print(f"[DEBUG] ParserAgent._extract_filters: query_lower={query_lower}")
 
         # Extract state filter
         for name, code in self.STATE_NAMES.items():
             if name in query_lower:
                 filters["state"] = code
+                print(f"[DEBUG] ParserAgent._extract_filters: Found state name '{name}' -> {code}")
                 break
 
         # Check for state codes
@@ -311,6 +313,7 @@ class ParserAgent:
             filters["has_apartment"] = True
             notes.append("Filter: apartment/unit addresses only")
 
+        print(f"[DEBUG] ParserAgent._extract_filters: FINAL filters={filters}")
         return filters
 
     def _extract_date_range(

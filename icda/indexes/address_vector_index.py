@@ -82,13 +82,11 @@ class AddressVectorIndex:
                 if not BOTO3_AVAILABLE:
                     logger.info("AddressVectorIndex: boto3 not installed")
                     return False
-                    
-                if not os.environ.get("AWS_ACCESS_KEY_ID") and not os.environ.get("AWS_PROFILE"):
-                    logger.info("AddressVectorIndex: No AWS credentials")
-                    return False
 
+                # Use default credential chain (supports env vars, profile, IAM role, SSO, etc.)
                 credentials = boto3.Session().get_credentials()
                 if not credentials:
+                    logger.info("AddressVectorIndex: No AWS credentials")
                     return False
                     
                 service = "aoss" if self.is_serverless else "es"

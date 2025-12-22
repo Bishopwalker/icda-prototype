@@ -74,8 +74,13 @@ Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
         self._client = None
         self._available = False
 
-        # Check for AWS credentials
-        if not os.environ.get("AWS_ACCESS_KEY_ID") and not os.environ.get("AWS_PROFILE"):
+        # Check if AWS credentials are available (supports default credential chain)
+        try:
+            session = boto3.Session()
+            if session.get_credentials() is None:
+                logger.info("NovaAgent: No AWS credentials - AI features disabled")
+                return
+        except Exception:
             logger.info("NovaAgent: No AWS credentials - AI features disabled")
             return
 

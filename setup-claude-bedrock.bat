@@ -16,8 +16,9 @@ REM ============================================================================
 REM AUTHENTICATION - Choose ONE method by uncommenting the appropriate section
 REM ============================================================================
 
-REM --- Option 1: AWS Profile (Recommended if you have AWS CLI configured) ---
-set AWS_PROFILE=NNGC
+REM --- Option 1: AWS Profile (Use if you have a named profile) ---
+REM set AWS_PROFILE=NNGC
+REM Note: On work computers, leave this commented out to use default credentials
 
 REM --- Option 2: Access Keys (Uncomment and fill in if using direct keys) ---
 REM set AWS_ACCESS_KEY_ID=your-access-key-id
@@ -39,6 +40,19 @@ REM set ANTHROPIC_SMALL_FAST_MODEL=us.anthropic.claude-haiku-4-5-20251001-v1:0
 
 REM Override region for small model if needed
 REM set ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION=us-west-2
+
+REM ============================================================================
+REM ICDA APPLICATION SETTINGS (Bedrock Nova + Titan Embeddings)
+REM ============================================================================
+
+REM Nova models for ICDA query processing
+set NOVA_MODEL=us.amazon.nova-pro-v1:0
+set NOVA_MODEL_MICRO=us.amazon.nova-micro-v1:0
+set NOVA_MODEL_PRO=us.amazon.nova-pro-v1:0
+
+REM Titan Embeddings for semantic search (uses same Bedrock credentials)
+set TITAN_EMBED_MODEL=amazon.titan-embed-text-v2:0
+set EMBED_DIMENSIONS=1024
 
 REM ============================================================================
 REM PERFORMANCE SETTINGS (Recommended)
@@ -63,11 +77,18 @@ echo  Claude Code - AWS Bedrock Configuration
 echo ============================================
 echo.
 echo Configuration Applied:
-echo   CLAUDE_CODE_USE_BEDROCK = %CLAUDE_CODE_USE_BEDROCK%
-echo   AWS_REGION              = %AWS_REGION%
-echo   AWS_PROFILE             = %AWS_PROFILE%
-echo   MAX_OUTPUT_TOKENS       = %CLAUDE_CODE_MAX_OUTPUT_TOKENS%
-echo   MAX_THINKING_TOKENS     = %MAX_THINKING_TOKENS%
+echo.
+echo   Claude Code (Bedrock):
+echo     CLAUDE_CODE_USE_BEDROCK = %CLAUDE_CODE_USE_BEDROCK%
+echo     AWS_REGION              = %AWS_REGION%
+echo     AWS_PROFILE             = %AWS_PROFILE% (empty = default credentials)
+echo     MAX_OUTPUT_TOKENS       = %CLAUDE_CODE_MAX_OUTPUT_TOKENS%
+echo     MAX_THINKING_TOKENS     = %MAX_THINKING_TOKENS%
+echo.
+echo   ICDA Application:
+echo     NOVA_MODEL              = %NOVA_MODEL%
+echo     TITAN_EMBED_MODEL       = %TITAN_EMBED_MODEL%
+echo     EMBED_DIMENSIONS        = %EMBED_DIMENSIONS%
 echo.
 echo ============================================
 echo.

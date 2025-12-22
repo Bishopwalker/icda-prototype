@@ -114,8 +114,13 @@ QUERY INTERPRETATION:
         self._use_orchestrator = use_orchestrator
         self._download_manager = download_manager
 
-        # Check if AWS credentials are configured
-        if not os.environ.get("AWS_ACCESS_KEY_ID") and not os.environ.get("AWS_PROFILE"):
+        # Check if AWS credentials are available (supports default credential chain)
+        try:
+            session = boto3.Session()
+            if session.get_credentials() is None:
+                logger.info("Nova: No AWS credentials - AI features disabled (LITE MODE)")
+                return
+        except Exception:
             logger.info("Nova: No AWS credentials - AI features disabled (LITE MODE)")
             return
 
