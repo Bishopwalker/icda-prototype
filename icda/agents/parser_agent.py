@@ -10,6 +10,7 @@ This agent processes the raw query to:
 
 import logging
 import re
+from difflib import get_close_matches
 from typing import Any
 
 from .models import IntentResult, QueryContext, ParsedQuery
@@ -24,7 +25,7 @@ class ParserAgent:
     """
     __slots__ = ("_db", "_available")
 
-    # State name to code mapping
+    # State name to code mapping (full names only - no abbreviations that conflict with words)
     STATE_NAMES = {
         "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
         "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE",
@@ -39,10 +40,37 @@ class ParserAgent:
         "south carolina": "SC", "south dakota": "SD", "tennessee": "TN", "texas": "TX",
         "utah": "UT", "vermont": "VT", "virginia": "VA", "washington": "WA",
         "west virginia": "WV", "wisconsin": "WI", "wyoming": "WY",
-        "district of columbia": "DC", "d.c.": "DC", "dc": "DC",
-        # Common variations
-        "cali": "CA", "ny": "NY", "la": "LA", "vegas": "NV",
+        "district of columbia": "DC", "d.c.": "DC",
+        # Common variations that don't conflict with English words
+        "cali": "CA", "vegas": "NV",
     }
+
+    # State codes that are also common English words - require special context
+    AMBIGUOUS_STATE_CODES = {"IN", "OR", "ME", "OK", "HI", "OH", "LA", "PA", "MA", "DC"}
+
+    # All valid state codes
+    VALID_STATE_CODES = {
+        "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+        "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+        "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+        "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "PR", "RI", "SC",
+        "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC",
+    }
+
+    # All state names for fuzzy matching
+    ALL_STATE_NAMES = [
+        "alabama", "alaska", "arizona", "arkansas", "california", "colorado",
+        "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho",
+        "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana",
+        "maine", "maryland", "massachusetts", "michigan", "minnesota",
+        "mississippi", "missouri", "montana", "nebraska", "nevada",
+        "new hampshire", "new jersey", "new mexico", "new york",
+        "north carolina", "north dakota", "ohio", "oklahoma", "oregon",
+        "pennsylvania", "puerto rico", "rhode island", "south carolina",
+        "south dakota", "tennessee", "texas", "utah", "vermont", "virginia",
+        "washington", "west virginia", "wisconsin", "wyoming",
+        "district of columbia",
+    ]
 
     # Move count interpretations
     MOVE_PATTERNS = {
@@ -67,6 +95,77 @@ class ParserAgent:
     def available(self) -> bool:
         """Check if agent is available."""
         return self._available
+
+    def _fuzzy_match_state(self, word: str, notes: list[str]) -> str | None:
+        """Try to fuzzy match a word to a state name.
+
+        Args:
+            word: Word to match.
+            notes: Resolution notes to append to.
+
+        Returns:
+            State code if matched, None otherwise.
+        """
+        word_lower = word.lower().strip()
+
+        # Skip very short words or common English words
+        if len(word_lower) < 4:
+            return None
+
+        # Try exact match first
+        if word_lower in self.STATE_NAMES:
+            return self.STATE_NAMES[word_lower]
+
+        # Try fuzzy matching with high threshold (0.8 = must be very similar)
+        matches = get_close_matches(word_lower, self.ALL_STATE_NAMES, n=1, cutoff=0.8)
+        if matches:
+            matched_name = matches[0]
+            code = self.STATE_NAMES[matched_name]
+            notes.append(f"Fuzzy matched '{word}' → {matched_name} ({code})")
+            return code
+
+        return None
+
+    def _is_likely_state_code_context(self, query: str, code: str, position: int) -> bool:
+        """Check if a 2-letter code is likely meant as a state code based on context.
+
+        Args:
+            query: The full query.
+            code: The 2-letter code found.
+            position: Position of the code in the query.
+
+        Returns:
+            True if likely a state code, False if likely a common word.
+        """
+        # Check for patterns that indicate it's a state code:
+        # - Preceded by city name pattern: "City, ST" or "City ST"
+        # - Followed by ZIP code
+        # - Part of address-like patterns
+
+        # Look for city-state patterns (e.g., "New York, NY" or "Denver CO")
+        before = query[:position].strip()
+        after = query[position + 2:].strip()
+
+        # Check for comma before (strong indicator of city, state)
+        if before.endswith(","):
+            return True
+
+        # Check for ZIP code after
+        if re.match(r"^\s*\d{5}", after):
+            return True
+
+        # Check if preceded by a capitalized word (likely city name)
+        # Pattern: "CityName ST" where ST is preceded by a word starting with capital
+        city_pattern = re.search(r"([A-Z][a-z]+)\s*$", before)
+        if city_pattern:
+            potential_city = city_pattern.group(1).lower()
+            # Make sure it's not a common word
+            common_words = {"how", "many", "users", "are", "the", "for", "from", "with"}
+            if potential_city not in common_words and potential_city not in self.STATE_NAMES:
+                return True
+
+        # For ambiguous codes, be conservative - require clear context
+        return False
 
     async def parse(
         self,
@@ -186,22 +285,45 @@ class ParserAgent:
         crids = re.findall(r"CRID[-\s]?(\d+)", query, re.IGNORECASE)
         entities["crids"] = [f"CRID-{c.zfill(5)}" for c in crids]
 
-        # Extract state codes
-        state_codes = re.findall(r"\b([A-Z]{2})\b", query.upper())
-        valid_states = {
-            "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
-            "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-            "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-            "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "PR", "RI", "SC",
-            "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC",
-        }
-        entities["states"] = [s for s in state_codes if s in valid_states]
+        # Extract state codes with context-aware filtering
+        # Find all 2-letter uppercase sequences with their positions
+        for match in re.finditer(r"\b([A-Z]{2})\b", query):
+            code = match.group(1)
+            position = match.start()
 
-        # Extract state names and convert to codes
+            # Skip if not a valid state code
+            if code not in self.VALID_STATE_CODES:
+                continue
+
+            # For ambiguous codes (IN, OR, ME, etc.), require clear context
+            if code in self.AMBIGUOUS_STATE_CODES:
+                if not self._is_likely_state_code_context(query, code, position):
+                    print(f"[DEBUG] Skipping ambiguous state code '{code}' - not in state context")
+                    continue
+
+            if code not in entities["states"]:
+                entities["states"].append(code)
+
+        # Extract state names (exact match) and convert to codes
         for name, code in self.STATE_NAMES.items():
-            if name in query.lower() and code not in entities["states"]:
+            # Use word boundary matching to avoid partial matches
+            pattern = rf"\b{re.escape(name)}\b"
+            if re.search(pattern, query.lower()) and code not in entities["states"]:
                 entities["states"].append(code)
                 notes.append(f"State: '{name}' → {code}")
+
+        # Fuzzy match for potential misspelled state names
+        # Look for capitalized words that might be misspelled states
+        words = re.findall(r"\b([A-Z][a-z]+)\b", query)
+        for word in words:
+            # Skip if too short or already matched
+            if len(word) < 4:
+                continue
+
+            # Try fuzzy matching
+            fuzzy_code = self._fuzzy_match_state(word, notes)
+            if fuzzy_code and fuzzy_code not in entities["states"]:
+                entities["states"].append(fuzzy_code)
 
         # Extract ZIP codes
         zips = re.findall(r"\b(\d{5})\b", query)
@@ -242,27 +364,41 @@ class ParserAgent:
         query_lower = query.lower()
         print(f"[DEBUG] ParserAgent._extract_filters: query_lower={query_lower}")
 
-        # Extract state filter
+        # Extract state filter - use word boundaries to avoid partial matches
         for name, code in self.STATE_NAMES.items():
-            if name in query_lower:
+            pattern = rf"\b{re.escape(name)}\b"
+            if re.search(pattern, query_lower):
                 filters["state"] = code
                 print(f"[DEBUG] ParserAgent._extract_filters: Found state name '{name}' -> {code}")
                 break
 
-        # Check for state codes
+        # Try fuzzy matching for misspelled state names if no exact match
         if "state" not in filters:
-            state_match = re.search(r"\b([A-Z]{2})\b", query)
-            if state_match:
-                code = state_match.group(1)
-                valid_states = {
-                    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
-                    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
-                    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
-                    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "PR", "RI", "SC",
-                    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC",
-                }
-                if code in valid_states:
-                    filters["state"] = code
+            words = re.findall(r"\b([A-Z][a-z]+)\b", query)
+            for word in words:
+                fuzzy_code = self._fuzzy_match_state(word, notes)
+                if fuzzy_code:
+                    filters["state"] = fuzzy_code
+                    print(f"[DEBUG] ParserAgent._extract_filters: Fuzzy matched '{word}' -> {fuzzy_code}")
+                    break
+
+        # Check for state codes (but filter out ambiguous ones without context)
+        if "state" not in filters:
+            for match in re.finditer(r"\b([A-Z]{2})\b", query):
+                code = match.group(1)
+                position = match.start()
+
+                if code not in self.VALID_STATE_CODES:
+                    continue
+
+                # For ambiguous codes, require clear context
+                if code in self.AMBIGUOUS_STATE_CODES:
+                    if not self._is_likely_state_code_context(query, code, position):
+                        print(f"[DEBUG] Skipping ambiguous state code '{code}' in filters")
+                        continue
+
+                filters["state"] = code
+                break
 
         # Use context state if not in query
         if "state" not in filters and context.geographic_context.get("state"):
