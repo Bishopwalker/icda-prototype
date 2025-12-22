@@ -50,7 +50,7 @@ class NovaClient:
 
     The orchestrated mode is enabled by default when available.
     """
-    __slots__ = ("client", "model", "available", "db", "_orchestrator", "_use_orchestrator")
+    __slots__ = ("client", "model", "available", "db", "_orchestrator", "_use_orchestrator", "_download_manager")
 
     _PROMPT = """You are ICDA, a customer data assistant. Be concise and helpful.
 
@@ -87,10 +87,11 @@ QUERY INTERPRETATION:
         address_orchestrator=None,
         session_store=None,
         guardrails=None,
-        gemini_enforcer=None,
+        llm_enforcer=None,
         use_orchestrator: bool = True,
+        download_manager=None,
     ):
-        """Initialize NovaClient with optional 7-agent pipeline + Gemini enforcer.
+        """Initialize NovaClient with optional 7-agent pipeline + LLM enforcer.
 
         Args:
             region: AWS region for Bedrock.
@@ -101,8 +102,9 @@ QUERY INTERPRETATION:
             address_orchestrator: Optional address verification orchestrator.
             session_store: Optional session store for context.
             guardrails: Optional Guardrails for PII filtering.
-            gemini_enforcer: Optional GeminiEnforcer for AI-powered validation.
+            llm_enforcer: Optional LLMEnforcer for AI-powered validation.
             use_orchestrator: Whether to use 8-agent pipeline (default True).
+            download_manager: Optional DownloadTokenManager for pagination.
         """
         self.model = model
         self.db = db
@@ -110,6 +112,7 @@ QUERY INTERPRETATION:
         self.available = False
         self._orchestrator = None
         self._use_orchestrator = use_orchestrator
+        self._download_manager = download_manager
 
         # Check if AWS credentials are configured
         if not os.environ.get("AWS_ACCESS_KEY_ID") and not os.environ.get("AWS_PROFILE"):
@@ -121,7 +124,7 @@ QUERY INTERPRETATION:
             self.available = True
             logger.info(f"Nova: Connected ({model})")
 
-            # Initialize 7-agent orchestrator + Gemini enforcer if enabled
+            # Initialize 7-agent orchestrator + LLM enforcer if enabled
             if use_orchestrator:
                 try:
                     self._orchestrator = create_query_orchestrator(
@@ -133,10 +136,11 @@ QUERY INTERPRETATION:
                         address_orchestrator=address_orchestrator,
                         session_store=session_store,
                         guardrails=guardrails,
-                        gemini_enforcer=gemini_enforcer,
+                        llm_enforcer=llm_enforcer,
+                        download_manager=download_manager,
                     )
-                    gemini_status = "with Gemini" if (gemini_enforcer and gemini_enforcer.available) else "without Gemini"
-                    logger.info(f"Nova: 7-agent orchestrator enabled ({gemini_status})")
+                    enforcer_status = f"with {llm_enforcer.client.provider}" if (llm_enforcer and llm_enforcer.available) else "without enforcer"
+                    logger.info(f"Nova: 7-agent orchestrator enabled ({enforcer_status})")
                 except Exception as e:
                     logger.warning(f"Nova: Orchestrator init failed, using simple mode - {e}")
                     self._orchestrator = None

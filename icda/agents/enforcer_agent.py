@@ -1,11 +1,11 @@
-"""Enforcer Agent - Quality gates and response validation with Gemini integration.
+"""Enforcer Agent - Quality gates and response validation with LLM integration.
 
 This agent:
 1. Validates response quality using 7 quality gates
 2. Applies guardrails (PII filtering)
 3. Checks response relevance
 4. Ensures completeness
-5. Uses Gemini for enhanced AI-powered validation (when available)
+5. Uses secondary LLM for enhanced AI-powered validation (when available)
 6. Returns final approved/modified response
 """
 
@@ -23,18 +23,18 @@ from .models import (
     ResponseStatus,
 )
 
-# Import Gemini enforcer (optional)
+# Import LLM enforcer (optional) - supports any provider
 try:
-    from icda.gemini import GeminiEnforcer
-    GEMINI_AVAILABLE = True
+    from icda.llm import LLMEnforcer
+    LLM_ENFORCER_AVAILABLE = True
 except ImportError:
-    GEMINI_AVAILABLE = False
+    LLM_ENFORCER_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
 
 class EnforcerAgent:
-    """Validates and enforces response quality with Gemini integration.
+    """Validates and enforces response quality with secondary LLM integration.
 
     Follows the enforcer pattern with 7 quality gates:
     1. RESPONSIVE - Response addresses the query
@@ -45,9 +45,10 @@ class EnforcerAgent:
     6. ON_TOPIC - No off-topic content
     7. CONFIDENCE_MET - Above threshold
 
-    When Gemini is available, adds AI-powered validation for hallucination detection.
+    When LLM enforcer is available (Gemini, OpenAI, Claude, etc.),
+    adds AI-powered validation for hallucination detection.
     """
-    __slots__ = ("_guardrails", "_gemini_enforcer", "_available")
+    __slots__ = ("_guardrails", "_llm_enforcer", "_available")
 
     # PII patterns for detection and redaction
     PII_PATTERNS = {
@@ -69,19 +70,20 @@ class EnforcerAgent:
         r"pin\s+number",
     ]
 
-    def __init__(self, guardrails=None, gemini_enforcer: "GeminiEnforcer | None" = None):
-        """Initialize EnforcerAgent with optional Gemini validation.
+    def __init__(self, guardrails=None, llm_enforcer: "LLMEnforcer | None" = None):
+        """Initialize EnforcerAgent with optional LLM validation.
 
         Args:
             guardrails: Optional Guardrails module for PII filtering.
-            gemini_enforcer: Optional GeminiEnforcer for AI-powered validation.
+            llm_enforcer: Optional LLMEnforcer for AI-powered validation.
         """
         self._guardrails = guardrails
-        self._gemini_enforcer = gemini_enforcer
+        self._llm_enforcer = llm_enforcer
         self._available = True
 
-        if self._gemini_enforcer and self._gemini_enforcer.available:
-            logger.info("EnforcerAgent: Gemini validation enabled")
+        if self._llm_enforcer and self._llm_enforcer.available:
+            provider = self._llm_enforcer.client.provider if self._llm_enforcer.client else "unknown"
+            logger.info(f"EnforcerAgent: LLM validation enabled ({provider})")
         else:
             logger.info("EnforcerAgent: Using rule-based validation only")
 
@@ -163,11 +165,11 @@ class EnforcerAgent:
         else:
             gates_failed.append(confidence_result)
 
-        # Optional: Gemini AI-powered validation for hallucination detection
-        gemini_quality_boost = 0.0
-        if self._gemini_enforcer and self._gemini_enforcer.available:
+        # Optional: LLM AI-powered validation for hallucination detection
+        llm_quality_boost = 0.0
+        if self._llm_enforcer and self._llm_enforcer.available:
             try:
-                # Convert tool_results to chunks format for Gemini review
+                # Convert tool_results to chunks format for LLM review
                 chunks = []
                 for result in nova_response.tool_results:
                     if isinstance(result, dict):
@@ -178,8 +180,8 @@ class EnforcerAgent:
                                     "text": f"{customer.get('name', 'N/A')} - {customer.get('city', 'N/A')}, {customer.get('state', 'N/A')}",
                                 })
 
-                # Review query with Gemini (non-blocking, uses sample rate)
-                review = await self._gemini_enforcer.review_query(
+                # Review query with LLM (non-blocking, uses sample rate)
+                review = await self._llm_enforcer.review_query(
                     query_id=f"enf_{id(nova_response)}",
                     query_text=query,
                     retrieved_chunks=chunks,
@@ -188,28 +190,28 @@ class EnforcerAgent:
                 )
 
                 if review:
-                    # Apply Gemini validation results
+                    # Apply LLM validation results
                     if review.hallucination_detected:
                         gates_failed.append(QualityGateResult(
                             gate=QualityGate.FACTUAL,
                             passed=False,
-                            message=f"Gemini detected hallucination: {review.hallucination_details}",
-                            details={"gemini_review": True},
+                            message=f"LLM detected hallucination: {review.hallucination_details}",
+                            details={"llm_review": True},
                         ))
-                        modifications.append("Gemini flagged potential hallucination")
+                        modifications.append("LLM enforcer flagged potential hallucination")
                     else:
-                        # Boost quality score if Gemini validates
-                        gemini_quality_boost = review.overall_quality * 0.1
-                        logger.debug(f"Gemini validation passed: {review.overall_quality:.2f}")
+                        # Boost quality score if LLM validates
+                        llm_quality_boost = review.overall_quality * 0.1
+                        logger.debug(f"LLM validation passed: {review.overall_quality:.2f}")
 
             except Exception as e:
-                logger.warning(f"Gemini validation failed: {e}")
-                # Continue without Gemini - graceful degradation
+                logger.warning(f"LLM validation failed: {e}")
+                # Continue without LLM - graceful degradation
 
-        # Calculate quality score (with optional Gemini boost)
+        # Calculate quality score (with optional LLM boost)
         total_gates = len(gates_passed) + len(gates_failed)
         quality_score = len(gates_passed) / total_gates if total_gates > 0 else 0.0
-        quality_score = min(1.0, quality_score + gemini_quality_boost)
+        quality_score = min(1.0, quality_score + llm_quality_boost)
 
         # Determine status
         status = self._determine_status(

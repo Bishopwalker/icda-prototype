@@ -68,25 +68,37 @@ class Config:
     index_knowledge: str = field(default_factory=lambda: getenv("INDEX_KNOWLEDGE", "icda-knowledge"))
     index_customers: str = field(default_factory=lambda: getenv("INDEX_CUSTOMERS", "icda-customers"))
 
-    # ==================== Gemini Enforcer (NEW) ====================
+    # ==================== Secondary LLM Enforcer ====================
+    # Provider: auto, gemini, openai, claude, openrouter
+    secondary_llm_provider: str = field(
+        default_factory=lambda: getenv("SECONDARY_LLM_PROVIDER", "auto")
+    )
+    # Provider-specific API keys (auto-detection checks all)
     gemini_api_key: str = field(default_factory=lambda: getenv("GEMINI_API_KEY", ""))
-    gemini_model: str = field(default_factory=lambda: getenv("GEMINI_MODEL", "gemini-2.0-flash"))
-    gemini_chunk_threshold: float = field(
-        default_factory=lambda: _parse_float(getenv("GEMINI_CHUNK_THRESHOLD", ""), 0.6)
+    openai_api_key: str = field(default_factory=lambda: getenv("OPENAI_API_KEY", ""))
+    anthropic_api_key: str = field(default_factory=lambda: getenv("ANTHROPIC_API_KEY", ""))
+    openrouter_api_key: str = field(default_factory=lambda: getenv("OPENROUTER_API_KEY", ""))
+    # Model override (empty = use provider default)
+    secondary_llm_model: str = field(
+        default_factory=lambda: getenv("SECONDARY_LLM_MODEL", "")
     )
-    gemini_query_sample_rate: float = field(
-        default_factory=lambda: _parse_float(getenv("GEMINI_QUERY_SAMPLE_RATE", ""), 0.1)
+    # Enforcement thresholds
+    enforcer_chunk_threshold: float = field(
+        default_factory=lambda: _parse_float(getenv("ENFORCER_CHUNK_THRESHOLD", ""), 0.6)
     )
-    gemini_validation_interval: int = field(
-        default_factory=lambda: _parse_int(getenv("GEMINI_VALIDATION_INTERVAL", ""), 6)
+    enforcer_query_sample_rate: float = field(
+        default_factory=lambda: _parse_float(getenv("ENFORCER_QUERY_SAMPLE_RATE", ""), 0.1)
+    )
+    enforcer_validation_interval: int = field(
+        default_factory=lambda: _parse_int(getenv("ENFORCER_VALIDATION_INTERVAL", ""), 6)
     )
 
-    # ==================== Feature Flags (NEW) ====================
+    # ==================== Feature Flags ====================
     enable_federation: bool = field(
         default_factory=lambda: _parse_bool(getenv("ENABLE_FEDERATION", ""), True)
     )
-    enable_gemini_enforcer: bool = field(
-        default_factory=lambda: _parse_bool(getenv("ENABLE_GEMINI_ENFORCER", ""), True)
+    enable_llm_enforcer: bool = field(
+        default_factory=lambda: _parse_bool(getenv("ENABLE_LLM_ENFORCER", ""), True)
     )
     enable_code_index: bool = field(
         default_factory=lambda: _parse_bool(getenv("ENABLE_CODE_INDEX", ""), False)
@@ -104,9 +116,22 @@ class Config:
             "customers": self.index_customers,
         }
 
+    def is_enforcer_available(self) -> bool:
+        """Check if LLM enforcer can be enabled (any provider)."""
+        if not self.enable_llm_enforcer:
+            return False
+        # Check if any provider API key is available
+        return bool(
+            self.gemini_api_key or
+            self.openai_api_key or
+            self.anthropic_api_key or
+            self.openrouter_api_key
+        )
+
+    # Backward compatibility
     def is_gemini_available(self) -> bool:
-        """Check if Gemini enforcer can be enabled."""
-        return bool(self.gemini_api_key) and self.enable_gemini_enforcer
+        """Deprecated: Use is_enforcer_available instead."""
+        return self.is_enforcer_available()
 
     def is_opensearch_available(self) -> bool:
         """Check if OpenSearch is configured."""

@@ -354,6 +354,27 @@ export const api = {
     return response.data;
   },
 
+  // Paginate results by token (for inline "See More" functionality)
+  paginateResults: async (
+    token: string,
+    offset: number = 0,
+    limit: number = 15
+  ): Promise<{
+    success: boolean;
+    data: Record<string, unknown>[];
+    offset: number;
+    limit: number;
+    total: number;
+    has_more: boolean;
+    remaining: number;
+  }> => {
+    const response = await apiClient.get(`/api/query/paginate/${token}`, {
+      params: { offset, limit },
+      timeout: 30000,
+    });
+    return response.data;
+  },
+
   // Helper to trigger file download in browser
   triggerDownload: (data: Blob | DownloadResult, filename: string, format: 'json' | 'csv') => {
     let blob: Blob;

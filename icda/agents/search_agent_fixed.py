@@ -61,6 +61,35 @@ class SearchAgent:
         Returns:
             SearchResult with results and metadata.
         """
+        # ============================================================
+        # CRITICAL FIX: Check if requested state is invalid FIRST
+        # This prevents searching for states that don't exist and
+        # returns helpful alternatives to the user
+        # ============================================================
+        if resolved.expanded_scope.get("state_valid") is False:
+            state_info = resolved.expanded_scope
+            # Build state counts dict from available_states_with_counts list
+            state_counts_dict = {}
+            for item in state_info.get("available_states_with_counts", []):
+                if isinstance(item, dict):
+                    state_counts_dict[item.get("code", "")] = item.get("count", 0)
+            
+            return SearchResult(
+                strategy_used=SearchStrategy.KEYWORD,
+                results=[],
+                total_matches=0,
+                search_metadata={"state_not_found": True},
+                alternatives_tried=[],
+                search_confidence=0.0,
+                # Populate the state availability fields on SearchResult
+                state_not_available=True,
+                requested_state=state_info.get("requested_state"),
+                requested_state_name=state_info.get("requested_state_name"),
+                available_states=state_info.get("available_states", []),
+                available_states_with_counts=state_counts_dict,
+                suggestion=state_info.get("suggestion"),
+            )
+        
         # If we have resolved customers from direct lookup, return them
         if resolved.resolved_customers:
             return SearchResult(
@@ -83,24 +112,6 @@ class SearchAgent:
                 strategy_results, strategy_meta = await self._execute_strategy(
                     strategy, parsed, resolved, intent
                 )
-
-                # Check for "state not available" error
-                if strategy_meta.get("error") == "state_not_available":
-                    # Return special result with state availability info
-                    return SearchResult(
-                        strategy_used=SearchStrategy.KEYWORD,
-                        results=[],
-                        total_matches=0,
-                        search_metadata=strategy_meta,
-                        alternatives_tried=alternatives_tried,
-                        search_confidence=0.0,
-                        state_not_available=True,
-                        requested_state=strategy_meta.get("requested_state"),
-                        requested_state_name=strategy_meta.get("requested_state_name"),
-                        available_states=strategy_meta.get("available_states", []),
-                        available_states_with_counts=strategy_meta.get("available_states_with_counts", {}),
-                        suggestion=strategy_meta.get("suggestion"),
-                    )
 
                 if strategy_results:
                     results = strategy_results
@@ -217,18 +228,6 @@ class SearchAgent:
             limit=parsed.limit * 2,  # Get extra for confidence
         )
 
-        # Check for state_not_available error
-        if result.get("error") == "state_not_available":
-            return [], {
-                "error": "state_not_available",
-                "message": result.get("message"),
-                "requested_state": result.get("requested_state"),
-                "requested_state_name": result.get("requested_state_name"),
-                "available_states": result.get("available_states", []),
-                "available_states_with_counts": result.get("available_states_with_counts", {}),
-                "suggestion": result.get("suggestion"),
-            }
-
         if result.get("success"):
             # Database returns "data" key, not "results"
             customers = result.get("data", [])
@@ -299,22 +298,6 @@ class SearchAgent:
 
         try:
             state_filter = parsed.filters.get("state")
-            
-            # Check if state exists before semantic search
-            if state_filter and hasattr(self._db, "has_state"):
-                if not self._db.has_state(state_filter):
-                    available = self._db.get_available_states() if hasattr(self._db, "get_available_states") else []
-                    state_name = getattr(self._db, "STATE_CODE_TO_NAME", {}).get(state_filter.upper(), state_filter)
-                    return [], {
-                        "error": "state_not_available",
-                        "message": f"No customer data available for {state_name} ({state_filter}).",
-                        "requested_state": state_filter.upper(),
-                        "requested_state_name": state_name,
-                        "available_states": available,
-                        "available_states_with_counts": self._db.get_state_counts() if hasattr(self._db, "get_state_counts") else {},
-                        "suggestion": f"Try one of our available states: {', '.join(available[:5])}...",
-                    }
-            
             results = await self._vector_index.search_customers_semantic(
                 parsed.normalized_query,
                 limit=parsed.limit * 2,
@@ -352,22 +335,6 @@ class SearchAgent:
 
         try:
             state_filter = parsed.filters.get("state")
-            
-            # Check if state exists before hybrid search
-            if state_filter and hasattr(self._db, "has_state"):
-                if not self._db.has_state(state_filter):
-                    available = self._db.get_available_states() if hasattr(self._db, "get_available_states") else []
-                    state_name = getattr(self._db, "STATE_CODE_TO_NAME", {}).get(state_filter.upper(), state_filter)
-                    return [], {
-                        "error": "state_not_available",
-                        "message": f"No customer data available for {state_name} ({state_filter}).",
-                        "requested_state": state_filter.upper(),
-                        "requested_state_name": state_name,
-                        "available_states": available,
-                        "available_states_with_counts": self._db.get_state_counts() if hasattr(self._db, "get_state_counts") else {},
-                        "suggestion": f"Try one of our available states: {', '.join(available[:5])}...",
-                    }
-            
             results = await self._vector_index.search_customers_hybrid(
                 parsed.normalized_query,
                 limit=parsed.limit * 2,

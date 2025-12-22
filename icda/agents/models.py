@@ -114,6 +114,7 @@ class PaginationInfo:
         has_more: Whether there are more results available.
         suggest_download: True if results exceed display limit.
         download_token: Token for fetching full results via download endpoint.
+        download_expires_at: ISO timestamp when token expires.
         preview_size: Number of results shown as preview.
     """
     total_count: int
@@ -121,6 +122,7 @@ class PaginationInfo:
     has_more: bool
     suggest_download: bool
     download_token: str | None = None
+    download_expires_at: str | None = None
     preview_size: int = 15
 
     def to_dict(self) -> dict[str, Any]:
@@ -134,6 +136,8 @@ class PaginationInfo:
         }
         if self.download_token:
             result["download_token"] = self.download_token
+        if self.download_expires_at:
+            result["download_expires_at"] = self.download_expires_at
         return result
 
 
@@ -313,6 +317,12 @@ class SearchResult:
         search_metadata: Timing, scores, etc.
         alternatives_tried: Strategies attempted before success.
         search_confidence: Confidence in results.
+        state_not_available: True if requested state not in dataset.
+        requested_state: State code that was requested but not available.
+        requested_state_name: Full name of requested state.
+        available_states: List of states that are available.
+        available_states_with_counts: Dict of state -> customer count.
+        suggestion: Helpful suggestion message.
     """
     strategy_used: SearchStrategy
     results: list[dict[str, Any]] = field(default_factory=list)
@@ -320,16 +330,32 @@ class SearchResult:
     search_metadata: dict[str, Any] = field(default_factory=dict)
     alternatives_tried: list[str] = field(default_factory=list)
     search_confidence: float = 0.0
+    # State availability fields
+    state_not_available: bool = False
+    requested_state: str | None = None
+    requested_state_name: str | None = None
+    available_states: list[str] = field(default_factory=list)
+    available_states_with_counts: dict[str, int] = field(default_factory=dict)
+    suggestion: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
-        return {
+        result = {
             "strategy_used": self.strategy_used.value,
             "results_count": len(self.results),
             "total_matches": self.total_matches,
             "alternatives_tried": self.alternatives_tried,
             "search_confidence": self.search_confidence,
         }
+        # Add state availability info if state not available
+        if self.state_not_available:
+            result["state_not_available"] = True
+            result["requested_state"] = self.requested_state
+            result["requested_state_name"] = self.requested_state_name
+            result["available_states"] = self.available_states
+            result["available_states_with_counts"] = self.available_states_with_counts
+            result["suggestion"] = self.suggestion
+        return result
 
 
 @dataclass(slots=True)

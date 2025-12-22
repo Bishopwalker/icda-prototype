@@ -87,7 +87,7 @@ class QueryOrchestrator:
         address_orchestrator=None,
         session_store=None,
         guardrails=None,
-        gemini_enforcer=None,
+        llm_enforcer=None,
         config: dict[str, Any] | None = None,
         download_manager=None,
     ):
@@ -102,7 +102,7 @@ class QueryOrchestrator:
             address_orchestrator: Optional address verification orchestrator.
             session_store: Optional session store for context.
             guardrails: Optional Guardrails for PII filtering.
-            gemini_enforcer: Optional GeminiEnforcer for AI-powered validation.
+            llm_enforcer: Optional LLMEnforcer for AI-powered validation.
             config: Optional configuration overrides.
             download_manager: Optional DownloadTokenManager for pagination.
         """
@@ -130,7 +130,7 @@ class QueryOrchestrator:
             address_orchestrator=address_orchestrator,
         )
 
-        # Initialize all 7 core agents + 1 Gemini-powered enforcer
+        # Initialize all 7 core agents + 1 LLM-powered enforcer
         # Each agent receives ONLY the context it needs (enforcer pattern)
         self._intent_agent = IntentAgent()
         self._context_agent = ContextAgent(session_manager=session_store)
@@ -145,13 +145,13 @@ class QueryOrchestrator:
         )
         self._enforcer_agent = EnforcerAgent(
             guardrails=guardrails,
-            gemini_enforcer=gemini_enforcer,
+            llm_enforcer=llm_enforcer,
         )
 
-        # Log initialization with Gemini status
-        gemini_status = "enabled" if (gemini_enforcer and gemini_enforcer.available) else "disabled"
+        # Log initialization with enforcer status
+        enforcer_status = f"enabled ({llm_enforcer.client.provider})" if (llm_enforcer and llm_enforcer.available) else "disabled"
         logger.info(
-            f"QueryOrchestrator initialized: {len(self._tool_registry.list_tools())} tools, Gemini enforcer: {gemini_status}"
+            f"QueryOrchestrator initialized: {len(self._tool_registry.list_tools())} tools, LLM enforcer: {enforcer_status}"
         )
         logger.info(f"Model routing: micro={model}, lite={lite_model}, pro={pro_model}, threshold={threshold}")
 
@@ -317,6 +317,7 @@ class QueryOrchestrator:
                     has_more=pagination_dict["has_more"],
                     suggest_download=pagination_dict["suggest_download"],
                     download_token=pagination_dict.get("download_token"),
+                    download_expires_at=pagination_dict.get("download_expires_at"),
                     preview_size=pagination_dict.get("preview_size", 15),
                 )
 
@@ -607,7 +608,7 @@ def create_query_orchestrator(
     address_orchestrator=None,
     session_store=None,
     guardrails=None,
-    gemini_enforcer=None,
+    llm_enforcer=None,
     config: dict[str, Any] | None = None,
     download_manager=None,
 ) -> QueryOrchestrator:
@@ -622,7 +623,7 @@ def create_query_orchestrator(
         address_orchestrator: Optional address verification orchestrator.
         session_store: Optional session store for context.
         guardrails: Optional Guardrails for PII filtering.
-        gemini_enforcer: Optional GeminiEnforcer for AI-powered validation.
+        llm_enforcer: Optional LLMEnforcer for AI-powered validation.
         config: Optional configuration dict for model routing settings.
         download_manager: Optional DownloadTokenManager for pagination.
 
@@ -638,7 +639,7 @@ def create_query_orchestrator(
         address_orchestrator=address_orchestrator,
         session_store=session_store,
         guardrails=guardrails,
-        gemini_enforcer=gemini_enforcer,
+        llm_enforcer=llm_enforcer,
         config=config,
         download_manager=download_manager,
     )

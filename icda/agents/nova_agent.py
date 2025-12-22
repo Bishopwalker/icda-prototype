@@ -211,6 +211,21 @@ Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
         """
         parts = []
 
+        # Check if requested state is not available
+        if getattr(search_result, 'state_not_available', False):
+            requested_state = getattr(search_result, 'requested_state_name', None) or getattr(search_result, 'requested_state', 'requested state')
+            available_states = getattr(search_result, 'available_states', [])
+            state_counts = getattr(search_result, 'available_states_with_counts', {})
+            
+            parts.append(f"STATE NOT AVAILABLE: {requested_state}")
+            parts.append(f"AVAILABLE STATES: {', '.join(available_states[:10])}")
+            if state_counts:
+                top_states = [(s, state_counts.get(s, 0)) for s in available_states[:5]]
+                counts_str = ', '.join([f"{s}:{c}" for s, c in top_states])
+                parts.append(f"TOP STATES (count): {counts_str}")
+            parts.append("INSTRUCTION: Inform user this state has no data. Suggest available states.")
+            return "\n".join(parts)
+
         # Add search results context - ultra-compact format to stay under token limits
         if search_result.results:
             total = search_result.total_matches
@@ -352,6 +367,34 @@ Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
         Returns:
             NovaResponse with template-based text.
         """
+        # Check if state was not available - give helpful redirect
+        if getattr(search_result, 'state_not_available', False):
+            requested_state = getattr(search_result, 'requested_state_name', None) or getattr(search_result, 'requested_state', 'that state')
+            available_states = getattr(search_result, 'available_states', [])
+            state_counts = getattr(search_result, 'available_states_with_counts', {})
+            
+            lines = [f"I don't have customer data for **{requested_state}** in this dataset.\n"]
+            lines.append("**Available states with customer data:**\n")
+            
+            # Show top states with counts
+            for state_code in available_states[:10]:
+                count = state_counts.get(state_code, 0)
+                lines.append(f"- **{state_code}**: {count:,} customers")
+            
+            if len(available_states) > 10:
+                lines.append(f"- ... and {len(available_states) - 10} more states")
+            
+            lines.append("\nWould you like to search customers in one of these states instead?")
+            
+            return NovaResponse(
+                response_text="\n".join(lines),
+                tools_used=[],
+                tool_results=[],
+                model_used="fallback",
+                token_usage=TokenUsage(),
+                ai_confidence=0.9,  # High confidence - we know exactly what happened
+            )
+        
         # Generate response from search results with COMPLETE customer data
         if search_result.results:
             total = search_result.total_matches

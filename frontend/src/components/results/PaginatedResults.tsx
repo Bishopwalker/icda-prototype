@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -19,6 +19,7 @@ import {
   ListItemText,
   Paper,
   Alert,
+  Divider,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import {
@@ -30,8 +31,10 @@ import {
   Description as CsvIcon,
   CloudDownload as CloudDownloadIcon,
   Info as InfoIcon,
+  KeyboardArrowDown as ShowMoreIcon,
 } from '@mui/icons-material';
 import { colors, borderRadius } from '../../theme';
+import api from '../../services/api';
 import type { PaginationInfo } from '../../types';
 
 interface PaginatedResultsProps {
@@ -88,15 +91,22 @@ const formatHeader = (key: string): string => {
 };
 
 export const PaginatedResults: React.FC<PaginatedResultsProps> = ({
-  results,
+  results: initialResults,
   pagination,
   onDownload,
   isDownloading = false,
 }) => {
-  const [viewMode, setViewMode] = React.useState<ViewMode>('table');
-  const [menuAnchor, setMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const [displayedResults, setDisplayedResults] = useState<Record<string, unknown>[]>(initialResults);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [currentOffset, setCurrentOffset] = useState(initialResults.length);
+  const [hasMoreToLoad, setHasMoreToLoad] = useState(pagination.has_more);
+  const [remainingCount, setRemainingCount] = useState(
+    pagination.total_count - pagination.returned_count
+  );
 
-  const columns = React.useMemo(() => getColumnHeaders(results), [results]);
+  const columns = React.useMemo(() => getColumnHeaders(displayedResults), [displayedResults]);
 
   const handleViewChange = (_: React.MouseEvent<HTMLElement>, newView: ViewMode | null) => {
     if (newView !== null) {
@@ -114,6 +124,30 @@ export const PaginatedResults: React.FC<PaginatedResultsProps> = ({
       onDownload(format);
     }
   };
+
+  const handleLoadMore = useCallback(async () => {
+    if (!pagination.download_token || isLoadingMore) return;
+
+    setIsLoadingMore(true);
+    try {
+      const response = await api.paginateResults(
+        pagination.download_token,
+        currentOffset,
+        15
+      );
+
+      if (response.success && response.data) {
+        setDisplayedResults((prev) => [...prev, ...response.data]);
+        setCurrentOffset((prev) => prev + response.data.length);
+        setHasMoreToLoad(response.has_more);
+        setRemainingCount(response.remaining);
+      }
+    } catch (error) {
+      console.error('Failed to load more results:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [pagination.download_token, currentOffset, isLoadingMore]);
 
   return (
     <Box
@@ -144,7 +178,7 @@ export const PaginatedResults: React.FC<PaginatedResultsProps> = ({
 
         {/* Count chip */}
         <Chip
-          label={`${pagination.returned_count} of ${pagination.total_count}`}
+          label={`${displayedResults.length} of ${pagination.total_count}`}
           size="small"
           sx={{
             height: 18,
@@ -155,10 +189,10 @@ export const PaginatedResults: React.FC<PaginatedResultsProps> = ({
         />
 
         {/* More available indicator */}
-        {pagination.has_more && (
+        {hasMoreToLoad && (
           <Chip
             icon={<InfoIcon sx={{ fontSize: 12 }} />}
-            label={`+${pagination.total_count - pagination.returned_count} more`}
+            label={`+${remainingCount} more`}
             size="small"
             sx={{
               height: 18,
@@ -267,7 +301,7 @@ export const PaginatedResults: React.FC<PaginatedResultsProps> = ({
       </Box>
 
       {/* Suggestion alert */}
-      {pagination.suggest_download && pagination.has_more && (
+      {pagination.suggest_download && hasMoreToLoad && (
         <Alert
           severity="info"
           icon={<CloudDownloadIcon sx={{ fontSize: 16 }} />}
@@ -285,7 +319,7 @@ export const PaginatedResults: React.FC<PaginatedResultsProps> = ({
             },
           }}
         >
-          Large result set detected. Download all {pagination.total_count} results for complete data.
+          Large result set detected. Use "See More" to view inline or download all {pagination.total_count} results.
         </Alert>
       )}
 
@@ -315,7 +349,7 @@ export const PaginatedResults: React.FC<PaginatedResultsProps> = ({
                 </TableRow>
               </TableHead>
               <TableBody>
-                {results.map((result, idx) => (
+                {displayedResults.map((result, idx) => (
                   <TableRow
                     key={idx}
                     sx={{
@@ -348,7 +382,7 @@ export const PaginatedResults: React.FC<PaginatedResultsProps> = ({
           </TableContainer>
         ) : (
           <Box sx={{ p: 1 }}>
-            {results.map((result, idx) => (
+            {displayedResults.map((result, idx) => (
               <Paper
                 key={idx}
                 elevation={0}
@@ -402,6 +436,50 @@ export const PaginatedResults: React.FC<PaginatedResultsProps> = ({
           </Box>
         )}
       </Box>
+
+      {/* See More Button - inline pagination */}
+      {hasMoreToLoad && pagination.download_token && (
+        <>
+          <Divider sx={{ borderColor: alpha(colors.text.primary, 0.08) }} />
+          <Box
+            sx={{
+              p: 1,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 1,
+              backgroundColor: alpha(colors.accent.main, 0.05),
+            }}
+          >
+            <Button
+              size="small"
+              variant="text"
+              startIcon={
+                isLoadingMore ? (
+                  <CircularProgress size={14} color="inherit" />
+                ) : (
+                  <ShowMoreIcon sx={{ fontSize: 16 }} />
+                )
+              }
+              onClick={handleLoadMore}
+              disabled={isLoadingMore}
+              sx={{
+                fontSize: '0.7rem',
+                textTransform: 'none',
+                color: colors.accent.light,
+                fontWeight: 500,
+                '&:hover': {
+                  backgroundColor: alpha(colors.accent.main, 0.1),
+                },
+              }}
+            >
+              {isLoadingMore
+                ? 'Loading...'
+                : `See More (${remainingCount} remaining)`}
+            </Button>
+          </Box>
+        </>
+      )}
 
       {/* Footer with pagination info */}
       {pagination.download_expires_at && (

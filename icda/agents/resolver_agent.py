@@ -57,6 +57,9 @@ class ResolverAgent:
         unresolved = []
         fallback_strategies = []
         expanded_scope = {}
+        
+        # Validate requested state exists in database
+        state_validation = self._validate_state(parsed)
 
         # Resolve CRIDs
         if parsed.entities.get("crids"):
@@ -74,6 +77,12 @@ class ResolverAgent:
 
         # Expand scope for multi-state or ambiguous queries
         expanded_scope = self._expand_scope(parsed, context)
+        
+        # Add state validation info to expanded_scope
+        if state_validation:
+            expanded_scope.update(state_validation)
+            if not state_validation.get("state_valid", True):
+                unresolved.append(f"state:{state_validation.get('requested_state')}")
 
         # Calculate resolution confidence
         confidence = self._calculate_confidence(
@@ -88,6 +97,71 @@ class ResolverAgent:
             resolution_confidence=confidence,
             unresolved_entities=unresolved,
         )
+
+    def _validate_state(self, parsed: ParsedQuery) -> dict[str, Any] | None:
+        """Validate requested state exists in database.
+
+        Args:
+            parsed: Parsed query with filters.
+
+        Returns:
+            Dict with validation info or None if no state filter.
+        """
+        requested_state = parsed.filters.get("state")
+        if not requested_state:
+            return None
+
+        # Get available states from database
+        available_states = set(self._db.by_state.keys())
+        
+        if requested_state.upper() in available_states:
+            return {
+                "state_valid": True,
+                "requested_state": requested_state.upper(),
+            }
+        
+        # State not found - provide helpful alternatives
+        # Get states with customer counts, sorted by count descending
+        state_counts = {
+            state: len(customers) 
+            for state, customers in self._db.by_state.items()
+        }
+        sorted_states = sorted(
+            state_counts.items(), 
+            key=lambda x: x[1], 
+            reverse=True
+        )
+        
+        # Map state codes to full names for better UX
+        state_names = {
+            "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas",
+            "CA": "California", "CO": "Colorado", "CT": "Connecticut", "DE": "Delaware",
+            "FL": "Florida", "GA": "Georgia", "HI": "Hawaii", "ID": "Idaho",
+            "IL": "Illinois", "IN": "Indiana", "IA": "Iowa", "KS": "Kansas",
+            "KY": "Kentucky", "LA": "Louisiana", "ME": "Maine", "MD": "Maryland",
+            "MA": "Massachusetts", "MI": "Michigan", "MN": "Minnesota", "MS": "Mississippi",
+            "MO": "Missouri", "MT": "Montana", "NE": "Nebraska", "NV": "Nevada",
+            "NH": "New Hampshire", "NJ": "New Jersey", "NM": "New Mexico", "NY": "New York",
+            "NC": "North Carolina", "ND": "North Dakota", "OH": "Ohio", "OK": "Oklahoma",
+            "OR": "Oregon", "PA": "Pennsylvania", "PR": "Puerto Rico", "RI": "Rhode Island",
+            "SC": "South Carolina", "SD": "South Dakota", "TN": "Tennessee", "TX": "Texas",
+            "UT": "Utah", "VT": "Vermont", "VA": "Virginia", "WA": "Washington",
+            "WV": "West Virginia", "WI": "Wisconsin", "WY": "Wyoming", "DC": "Washington DC",
+        }
+        
+        requested_name = state_names.get(requested_state.upper(), requested_state)
+        
+        return {
+            "state_valid": False,
+            "requested_state": requested_state.upper(),
+            "requested_state_name": requested_name,
+            "available_states": [s for s, _ in sorted_states],
+            "available_states_with_counts": [
+                {"code": s, "name": state_names.get(s, s), "count": c}
+                for s, c in sorted_states
+            ],
+            "suggestion": f"{requested_name} is not in our database. We have customer data for {len(available_states)} states.",
+        }
 
     async def _resolve_crids(self, crids: list[str]) -> tuple[list[str], list[str]]:
         """Validate CRIDs exist in database.

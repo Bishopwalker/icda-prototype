@@ -1,33 +1,44 @@
 """
-Gemini Enforcer Package.
+Gemini Enforcer Package - DEPRECATED.
 
-Provides 3-level quality enforcement using Google Gemini:
-- Level 1: Chunk Quality Gate (pre-index)
-- Level 2: Index Validation (periodic)
-- Level 3: Query Review (runtime)
+This package is deprecated. Use icda.llm instead for provider-agnostic LLM support.
 
-Usage:
+For backward compatibility, all exports are re-exported from icda.llm.
+
+Migration:
+    # Old (deprecated)
     from icda.gemini import GeminiEnforcer
 
-    enforcer = GeminiEnforcer()
-    result = await enforcer.evaluate_chunk(chunk_id, content)
+    # New (recommended)
+    from icda.llm import LLMEnforcer
 """
 
-from .client import GeminiClient, GeminiConfig
-from .enforcer import GeminiEnforcer
-from .models import (
+import warnings
+
+# Re-export from new location for backward compatibility
+from icda.llm import (
+    LLMEnforcer as GeminiEnforcer,  # Alias for backward compat
+    LLMConfig as GeminiConfig,       # Alias for backward compat
     ChunkQualityScore,
     ChunkGateResult,
     IndexHealthReport,
     QueryReviewResult,
     EnforcerMetrics,
 )
+from icda.llm.providers import GeminiClient
+
+# Emit deprecation warning on import
+warnings.warn(
+    "icda.gemini is deprecated. Use icda.llm instead for provider-agnostic support.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = [
-    # Client
+    # Client (backward compat)
     "GeminiClient",
     "GeminiConfig",
-    # Main enforcer
+    # Main enforcer (backward compat alias)
     "GeminiEnforcer",
     # Models
     "ChunkQualityScore",

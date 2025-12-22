@@ -34,8 +34,8 @@ from icda.knowledge import KnowledgeManager
 from icda.knowledge_watcher import KnowledgeWatcher
 from icda.download_tokens import DownloadTokenManager
 
-# Gemini Enforcer imports
-from icda.gemini import GeminiEnforcer, GeminiConfig
+# LLM Enforcer imports (provider-agnostic)
+from icda.llm import LLMEnforcer, create_llm_client
 
 # Address verification imports
 from icda.address_index import AddressIndex
@@ -73,8 +73,8 @@ _zip_database: ZipDatabase = None
 _address_vector_index: AddressVectorIndex = None
 _orchestrator: AddressAgentOrchestrator = None
 
-# Gemini Enforcer global
-_enforcer: GeminiEnforcer = None
+# LLM Enforcer global (supports any secondary LLM provider)
+_enforcer: LLMEnforcer = None
 
 # Download Token Manager global
 _download_manager: DownloadTokenManager = None
@@ -203,6 +203,30 @@ async def lifespan(app: FastAPI):
 
     _db = CustomerDB(BASE_DIR / "customer_data.json")
     print(f"Customer database: {len(_db.customers)} customers loaded")
+    print(f"  Available states: {', '.join(_db.get_available_states()[:10])}{'...' if len(_db.available_states) > 10 else ''}")
+
+    # ============================================================
+    # AUTO-INDEX: Sync customer data to OpenSearch if needed
+    # This ensures the vector index stays in sync when you:
+    # - Switch to a different JSON file
+    # - Connect to a database
+    # - Update the customer data
+    # ============================================================
+    if _vector_index.available and _embedder.available:
+        indexed_count = await _vector_index.customer_count()
+        db_count = len(_db.customers)
+        
+        # Reindex if counts don't match or index is empty
+        if indexed_count != db_count:
+            print(f"\n  Auto-indexing customers (DB: {db_count:,}, Index: {indexed_count:,})...")
+            result = await _vector_index.index_customers(_db.customers, batch_size=100)
+            print(f"  Indexed {result.get('indexed', 0):,} customers into OpenSearch")
+            if result.get('errors', 0) > 0:
+                print(f"  Warnings: {result['errors']} indexing errors")
+        else:
+            print(f"  Customer index: {indexed_count:,} customers (in sync)")
+    else:
+        print("  Customer indexing skipped (OpenSearch or embeddings not available)")
 
     _sessions = SessionManager(_cache)
 
@@ -279,28 +303,29 @@ async def lifespan(app: FastAPI):
     _knowledge_watcher = KnowledgeWatcher(KNOWLEDGE_DIR, index_file_callback)
     _knowledge_watcher.start()
 
-    # Initialize Gemini Enforcer FIRST (optional, graceful degradation if no API key)
+    # Initialize LLM Enforcer FIRST (optional, graceful degradation if no API key)
     # This must be done before NovaClient so it can be passed to the orchestrator
-    print("\nInitializing Gemini Enforcer...")
-    gemini_config = GeminiConfig(
-        api_key=cfg.gemini_api_key,
-        model=cfg.gemini_model,
+    # Supports any secondary LLM: Gemini, OpenAI, Claude, OpenRouter
+    print("\nInitializing LLM Enforcer...")
+    llm_client = create_llm_client(
+        provider=cfg.secondary_llm_provider,
+        model=cfg.secondary_llm_model if cfg.secondary_llm_model else None,
     )
-    _enforcer = GeminiEnforcer(
-        config=gemini_config,
-        chunk_threshold=cfg.gemini_chunk_threshold,
-        query_sample_rate=cfg.gemini_query_sample_rate,
-        validation_interval_hours=cfg.gemini_validation_interval,
+    _enforcer = LLMEnforcer(
+        client=llm_client,
+        chunk_threshold=cfg.enforcer_chunk_threshold,
+        query_sample_rate=cfg.enforcer_query_sample_rate,
+        validation_interval_hours=cfg.enforcer_validation_interval,
     )
     if _enforcer.available:
-        print(f"  Enforcer: enabled (model: {cfg.gemini_model})")
-        print(f"  - L1 Chunk Gate: threshold {cfg.gemini_chunk_threshold}")
-        print(f"  - L2 Index Validation: every {cfg.gemini_validation_interval}h")
-        print(f"  - L3 Query Review: {int(cfg.gemini_query_sample_rate * 100)}% sample")
+        print(f"  Enforcer: enabled (provider: {llm_client.provider}, model: {llm_client.config.model})")
+        print(f"  - L1 Chunk Gate: threshold {cfg.enforcer_chunk_threshold}")
+        print(f"  - L2 Index Validation: every {cfg.enforcer_validation_interval}h")
+        print(f"  - L3 Query Review: {int(cfg.enforcer_query_sample_rate * 100)}% sample")
     else:
-        print("  Enforcer: disabled (no GEMINI_API_KEY)")
+        print("  Enforcer: disabled (no LLM API key found)")
 
-    # Initialize NovaClient with 7-agent pipeline + Gemini enforcer
+    # Initialize NovaClient with 7-agent pipeline + LLM enforcer
     print("\nInitializing AI query pipeline...")
     _nova = NovaClient(
         region=cfg.aws_region,
@@ -310,13 +335,14 @@ async def lifespan(app: FastAPI):
         knowledge=_knowledge,  # Pass knowledge manager for RAG
         address_orchestrator=_orchestrator,
         session_store=_sessions,
-        gemini_enforcer=_enforcer,  # Pass Gemini enforcer for quality validation
+        llm_enforcer=_enforcer,  # Pass LLM enforcer for quality validation
         use_orchestrator=True,  # Enable 7-agent pipeline
+        download_manager=_download_manager,  # Pass download manager for pagination
     )
     if _nova.available:
         if _nova.orchestrator:
-            gemini_status = " + Gemini enforcer" if _enforcer.available else ""
-            print(f"  Nova AI: enabled with 7-agent orchestrator{gemini_status}")
+            enforcer_status = f" + {llm_client.provider} enforcer" if _enforcer.available else ""
+            print(f"  Nova AI: enabled with 7-agent orchestrator{enforcer_status}")
             print(f"    - KnowledgeAgent: {'enabled' if _nova.orchestrator._knowledge_agent.available else 'disabled'}")
         else:
             print(f"  Nova AI: enabled (simple mode)")
@@ -449,6 +475,40 @@ async def download_results(token: str, format: str = "json"):
     return result
 
 
+@app.get("/api/query/paginate/{token}")
+async def paginate_results(token: str, offset: int = 0, limit: int = 15):
+    """Get a page of results using download token for inline pagination.
+
+    Args:
+        token: Download token from paginated query response.
+        offset: Starting index for results (0-based).
+        limit: Maximum number of results to return.
+
+    Returns:
+        Paginated result set with metadata.
+    """
+    if not _download_manager:
+        return {"success": False, "error": "Download manager not available"}
+
+    result = await _download_manager.get_full_results_async(token)
+    if not result:
+        return {"success": False, "error": "Invalid or expired download token"}
+
+    data = result.get("data", [])
+    total = len(data)
+    page_data = data[offset:offset + limit]
+
+    return {
+        "success": True,
+        "data": page_data,
+        "offset": offset,
+        "limit": limit,
+        "total": total,
+        "has_more": offset + limit < total,
+        "remaining": max(0, total - offset - limit),
+    }
+
+
 @app.get("/api/health")
 async def health():
     """Health check with mode status - flat structure for frontend compatibility"""
@@ -528,6 +588,82 @@ async def index_status():
         "opensearch_available": _vector_index.available if _vector_index else False,
         "customer_index": _vector_index.customer_index if _vector_index else None,
         "indexed_customers": await _vector_index.customer_count() if _vector_index else 0
+    }
+
+
+@app.get("/api/data/states")
+async def get_available_states():
+    """Get all states available in the current data source.
+    
+    This is dynamically derived from the actual data, not hardcoded.
+    Use this to know what states you can query for.
+    """
+    if not _db:
+        return {"success": False, "error": "Database not loaded"}
+    
+    states = _db.get_available_states()
+    counts = _db.get_state_counts()
+    
+    return {
+        "success": True,
+        "total_states": len(states),
+        "total_customers": len(_db.customers),
+        "states": [
+            {
+                "code": code,
+                "name": _db.STATE_CODE_TO_NAME.get(code, code),
+                "customer_count": counts.get(code, 0)
+            }
+            for code in states
+        ]
+    }
+
+
+@app.post("/api/data/reindex")
+async def reindex_customer_data(force: bool = False):
+    """Trigger reindexing of customer data into OpenSearch.
+    
+    Use this when:
+    - You've switched to a new data source
+    - You've updated the customer data file
+    - The index seems out of sync
+    
+    Args:
+        force: If True, delete and recreate the index. If False, only reindex if counts differ.
+    """
+    if not _vector_index or not _vector_index.available:
+        return {"success": False, "error": "OpenSearch not available"}
+    if not _embedder or not _embedder.available:
+        return {"success": False, "error": "Embeddings not available"}
+    if not _db:
+        return {"success": False, "error": "Database not loaded"}
+    
+    indexed_count = await _vector_index.customer_count()
+    db_count = len(_db.customers)
+    
+    if not force and indexed_count == db_count:
+        return {
+            "success": True,
+            "message": "Index already in sync",
+            "indexed": indexed_count,
+            "db_count": db_count
+        }
+    
+    # Delete existing index if force
+    if force:
+        await _vector_index.delete_customer_index()
+        await _cache.clear()  # Clear cache too
+    
+    # Reindex
+    result = await _vector_index.index_customers(_db.customers, batch_size=100)
+    
+    return {
+        "success": True,
+        "indexed": result.get("indexed", 0),
+        "errors": result.get("errors", 0),
+        "previous_count": indexed_count,
+        "db_count": db_count,
+        "available_states": _db.get_available_states()
     }
 
 
@@ -977,7 +1113,7 @@ async def admin_export_stats():
                 "opensearch_host": cfg.opensearch_host,
                 "redis_url": bool(cfg.redis_url),
                 "federation_enabled": cfg.enable_federation,
-                "enforcer_enabled": cfg.enable_gemini_enforcer,
+                "enforcer_enabled": cfg.enable_llm_enforcer,
                 "admin_enabled": cfg.admin_enabled
             }
         }
@@ -1103,7 +1239,7 @@ async def admin_run_saved_query(query_id: str):
 
 @app.get("/api/admin/enforcer/metrics")
 async def admin_enforcer_metrics():
-    """Get Gemini Enforcer pipeline metrics."""
+    """Get LLM Enforcer pipeline metrics."""
     if not cfg.admin_enabled:
         return {"success": False, "error": "Admin API disabled"}
 
@@ -1120,10 +1256,11 @@ async def admin_enforcer_metrics():
         "available": _enforcer.available,
         "metrics": _enforcer.get_metrics(),
         "config": {
-            "model": cfg.gemini_model,
-            "chunk_threshold": cfg.gemini_chunk_threshold,
-            "query_sample_rate": cfg.gemini_query_sample_rate,
-            "validation_interval_hours": cfg.gemini_validation_interval
+            "provider": cfg.secondary_llm_provider,
+            "model": cfg.secondary_llm_model or "auto",
+            "chunk_threshold": cfg.enforcer_chunk_threshold,
+            "query_sample_rate": cfg.enforcer_query_sample_rate,
+            "validation_interval_hours": cfg.enforcer_validation_interval
         }
     }
 
