@@ -26,6 +26,7 @@ SUPPORTED_EXTENSIONS = {
     '.xls', '.xlsx',                   # Excel
     '.csv',                            # CSV
     '.odt', '.odf',                    # OpenDocument
+    '.html', '.htm',                   # HTML
 }
 
 
@@ -132,10 +133,10 @@ class KnowledgeWatcher:
 
         handler = KnowledgeFileHandler(self.index_callback, loop)
         self.observer = Observer()
-        self.observer.schedule(handler, str(self.knowledge_dir), recursive=False)
+        self.observer.schedule(handler, str(self.knowledge_dir), recursive=True)
         self.observer.start()
         self._running = True
-        print(f"  Knowledge watcher: monitoring {self.knowledge_dir}")
+        print(f"  Knowledge watcher: monitoring {self.knowledge_dir} (recursive)")
 
     def stop(self):
         """Stop watching."""

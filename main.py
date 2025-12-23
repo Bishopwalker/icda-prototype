@@ -13,12 +13,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()  # Must be before importing config
 
-from fastapi import FastAPI, Request, UploadFile, File, Form
+from fastapi import FastAPI, Request, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Optional
+import asyncio
 import tempfile
 import shutil
 
@@ -32,7 +33,13 @@ from icda.router import Router
 from icda.session import SessionManager
 from icda.knowledge import KnowledgeManager
 from icda.knowledge_watcher import KnowledgeWatcher
+from icda.knowledge_index_state import (
+    compute_file_hash, load_index_state, save_index_state,
+    update_file_state, remove_file_state, needs_reindex,
+    get_stale_files, get_orphaned_entries, mark_full_reindex, get_stats as get_state_stats
+)
 from icda.download_tokens import DownloadTokenManager
+from icda.progress_tracker import ProgressTracker, format_bytes, format_duration
 
 # LLM Enforcer imports (provider-agnostic)
 from icda.llm import LLMEnforcer, create_llm_client
@@ -50,6 +57,9 @@ cfg = Config()  # Fresh instance after dotenv loaded
 
 BASE_DIR = Path(__file__).parent
 KNOWLEDGE_DIR = BASE_DIR / "knowledge"
+KNOWLEDGE_DATA_DIR = KNOWLEDGE_DIR / "data"
+KNOWLEDGE_UPLOADED_DIR = KNOWLEDGE_DIR / "data-uploaded"
+INDEX_STATE_FILE = KNOWLEDGE_DIR / ".index_state.json"
 
 # Supported knowledge file extensions for auto-indexing
 KNOWLEDGE_EXTENSIONS = {".md", ".txt", ".json", ".pdf", ".docx", ".doc", ".odt", ".odf", ".csv", ".xls", ".xlsx"}
@@ -64,6 +74,7 @@ _sessions: SessionManager = None
 _router: Router = None
 _knowledge: KnowledgeManager = None
 _knowledge_watcher: KnowledgeWatcher = None
+_index_state: dict = None
 
 # Address verification globals
 _address_index: AddressIndex = None
@@ -78,6 +89,9 @@ _enforcer: LLMEnforcer = None
 
 # Download Token Manager global
 _download_manager: DownloadTokenManager = None
+
+# Progress Tracker global (for real-time indexing progress)
+_progress_tracker: ProgressTracker = None
 
 
 def _extract_tags_from_content(content: str, filepath: Path) -> list[str]:
@@ -112,20 +126,29 @@ def _extract_tags_from_content(content: str, filepath: Path) -> list[str]:
     return list(set(tags))
 
 
-async def auto_index_knowledge_documents(knowledge_manager: KnowledgeManager) -> dict:
-    """Auto-index all documents from /knowledge directory recursively."""
+async def auto_index_knowledge_documents(knowledge_manager: KnowledgeManager, state: dict = None) -> dict:
+    """
+    Auto-index all documents from /knowledge directory using content hash tracking.
+
+    Uses hash comparison to avoid re-indexing unchanged files and cleans up orphaned entries.
+    """
     if not knowledge_manager or not knowledge_manager.available:
-        return {"indexed": 0, "skipped": 0, "failed": 0}
+        return {"indexed": 0, "skipped": 0, "failed": 0, "orphans_removed": 0}
 
     if not KNOWLEDGE_DIR.exists():
-        return {"indexed": 0, "skipped": 0, "failed": 0}
+        return {"indexed": 0, "skipped": 0, "failed": 0, "orphans_removed": 0}
 
-    existing_docs = await knowledge_manager.list_documents(limit=1000)
-    existing_filenames = {doc["filename"] for doc in existing_docs}
+    # Load or use provided state
+    if state is None:
+        state = load_index_state(INDEX_STATE_FILE)
 
     indexed = 0
     skipped = 0
     failed = 0
+
+    # Ensure data directories exist
+    KNOWLEDGE_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    KNOWLEDGE_UPLOADED_DIR.mkdir(parents=True, exist_ok=True)
 
     # Recursively find all knowledge files
     for filepath in KNOWLEDGE_DIR.rglob("*"):
@@ -133,13 +156,21 @@ async def auto_index_knowledge_documents(knowledge_manager: KnowledgeManager) ->
             continue
         if filepath.suffix.lower() not in KNOWLEDGE_EXTENSIONS:
             continue
-        if filepath.name.startswith(".") or filepath.name == "README.md":
+        if filepath.name.startswith(".") or filepath.name.lower() == "readme.md":
             continue
 
         relative_path = filepath.relative_to(KNOWLEDGE_DIR)
         filename = str(relative_path).replace("\\", "/")
 
-        if filename in existing_filenames:
+        # Check if file needs reindexing using content hash
+        try:
+            current_hash = compute_file_hash(filepath)
+        except Exception as e:
+            print(f"  [ERROR] Hash failed: {filename} - {e}")
+            failed += 1
+            continue
+
+        if not needs_reindex(state, filename, current_hash):
             skipped += 1
             continue
 
@@ -158,6 +189,13 @@ async def auto_index_knowledge_documents(knowledge_manager: KnowledgeManager) ->
 
             if result.get("success"):
                 print(f"  [OK] Indexed: {filename} ({result.get('chunks_indexed', 0)} chunks)")
+                update_file_state(
+                    state,
+                    filename,
+                    result.get("doc_id", ""),
+                    current_hash,
+                    result.get("chunks_indexed", 0)
+                )
                 indexed += 1
             else:
                 print(f"  [FAIL] Failed: {filename} - {result.get('error')}")
@@ -166,7 +204,23 @@ async def auto_index_knowledge_documents(knowledge_manager: KnowledgeManager) ->
             print(f"  [ERROR] Error: {filename} - {e}")
             failed += 1
 
-    return {"indexed": indexed, "skipped": skipped, "failed": failed}
+    # Clean up orphaned entries (files that were deleted)
+    orphans = get_orphaned_entries(state, KNOWLEDGE_DIR)
+    orphans_removed = 0
+    for orphan_path, doc_id in orphans:
+        if doc_id:
+            try:
+                await knowledge_manager.delete_document(doc_id)
+                print(f"  [CLEANUP] Removed orphan: {orphan_path}")
+                orphans_removed += 1
+            except Exception as e:
+                print(f"  [ERROR] Failed to remove orphan: {orphan_path} - {e}")
+        remove_file_state(state, orphan_path)
+
+    # Save updated state
+    save_index_state(INDEX_STATE_FILE, state)
+
+    return {"indexed": indexed, "skipped": skipped, "failed": failed, "orphans_removed": orphans_removed}
 
 
 @asynccontextmanager
@@ -174,7 +228,7 @@ async def lifespan(app: FastAPI):
     global _cache, _embedder, _vector_index, _db, _nova, _sessions, _router, _knowledge, _knowledge_watcher
     global _address_index, _address_completer, _address_pipeline
     global _zip_database, _address_vector_index, _orchestrator
-    global _enforcer, _download_manager
+    global _enforcer, _download_manager, _index_state, _progress_tracker
 
     print("\n" + "="*50)
     print("  ICDA Startup")
@@ -190,6 +244,10 @@ async def lifespan(app: FastAPI):
         print("\n[FATAL] Redis is REQUIRED but not available!")
         print("        Start Redis with: docker-compose up -d redis")
         raise RuntimeError("Redis is required for ICDA")
+
+    # Initialize progress tracker for real-time indexing feedback
+    _progress_tracker = ProgressTracker(_cache)
+    print(f"  Progress tracker: {'enabled' if _progress_tracker.available else 'disabled (no Redis)'}")
 
     _embedder = EmbeddingClient(cfg.aws_region, cfg.titan_embed_model, cfg.embed_dimensions)
 
@@ -271,13 +329,17 @@ async def lifespan(app: FastAPI):
     await _knowledge.ensure_index()
 
     # Auto-index knowledge documents (scans /knowledge folder recursively)
+    # Load index state for hash-based change detection
+    _index_state = load_index_state(INDEX_STATE_FILE)
     if KNOWLEDGE_DIR.exists():
         print("Auto-indexing knowledge documents from /knowledge folder...")
-        result = await auto_index_knowledge_documents(_knowledge)
+        result = await auto_index_knowledge_documents(_knowledge, _index_state)
         if result["indexed"]:
-            print(f"  New: {result['indexed']}")
+            print(f"  New/Modified: {result['indexed']}")
         if result["skipped"]:
-            print(f"  Skipped (existing): {result['skipped']}")
+            print(f"  Unchanged (skipped): {result['skipped']}")
+        if result.get("orphans_removed"):
+            print(f"  Orphans removed: {result['orphans_removed']}")
         if result["failed"]:
             print(f"  Failed: {result['failed']}")
 
@@ -286,17 +348,39 @@ async def lifespan(app: FastAPI):
 
     # Start knowledge file watcher for auto-indexing new files
     async def index_file_callback(filepath: Path) -> dict:
-        """Callback for file watcher to index new files."""
+        """Callback for file watcher to index new/modified files."""
+        global _index_state
         try:
+            relative_path = str(filepath.relative_to(KNOWLEDGE_DIR)).replace("\\", "/")
+            content_hash = compute_file_hash(filepath)
+
+            # Check if actually changed
+            if _index_state and not needs_reindex(_index_state, relative_path, content_hash):
+                return {"success": True, "skipped": True, "reason": "unchanged"}
+
             content = filepath.read_text(encoding="utf-8", errors="ignore")
             tags = _extract_tags_from_content(content, filepath)
             category = filepath.parent.name if filepath.parent != KNOWLEDGE_DIR else "general"
-            return await _knowledge.index_document(
+
+            result = await _knowledge.index_document(
                 content=filepath,
-                filename=filepath.name,
+                filename=relative_path,
                 tags=tags,
                 category=category
             )
+
+            # Update index state on success
+            if result.get("success") and _index_state is not None:
+                update_file_state(
+                    _index_state,
+                    relative_path,
+                    result.get("doc_id", ""),
+                    content_hash,
+                    result.get("chunks_indexed", 0)
+                )
+                save_index_state(INDEX_STATE_FILE, _index_state)
+
+            return result
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -634,16 +718,17 @@ async def get_available_states():
 
 
 @app.post("/api/data/reindex")
-async def reindex_customer_data(force: bool = False):
+async def reindex_customer_data(force: bool = False, async_mode: bool = False):
     """Trigger reindexing of customer data into OpenSearch.
-    
+
     Use this when:
     - You've switched to a new data source
     - You've updated the customer data file
     - The index seems out of sync
-    
+
     Args:
         force: If True, delete and recreate the index. If False, only reindex if counts differ.
+        async_mode: If True, run in background and return operation_id for progress tracking.
     """
     if not _vector_index or not _vector_index.available:
         return {"success": False, "error": "OpenSearch not available"}
@@ -651,10 +736,10 @@ async def reindex_customer_data(force: bool = False):
         return {"success": False, "error": "Embeddings not available"}
     if not _db:
         return {"success": False, "error": "Database not loaded"}
-    
+
     indexed_count = await _vector_index.customer_count()
     db_count = len(_db.customers)
-    
+
     if not force and indexed_count == db_count:
         return {
             "success": True,
@@ -662,15 +747,79 @@ async def reindex_customer_data(force: bool = False):
             "indexed": indexed_count,
             "db_count": db_count
         }
-    
-    # Delete existing index if force
+
+    # Async mode: run in background with progress tracking
+    if async_mode and _progress_tracker:
+        op_id = await _progress_tracker.start_operation(
+            operation_type="customer_index",
+            total_items=db_count,
+            total_batches=db_count // 100 + 1,
+        )
+
+        async def run_reindex():
+            try:
+                if force:
+                    await _progress_tracker.update_progress(op_id, phase="Deleting old index")
+                    await _vector_index.delete_customer_index()
+                    await _cache.clear()
+
+                await _progress_tracker.update_progress(op_id, phase="Indexing customers")
+
+                # Progress callback for batch updates
+                async def on_progress(processed: int, total: int):
+                    batch = processed // 100
+                    bytes_est = processed * 200  # ~200 bytes per customer
+                    embeddings_est = processed  # 1 embedding per customer
+                    await _progress_tracker.update_progress(
+                        op_id,
+                        processed=processed,
+                        batch=batch,
+                        bytes_processed=bytes_est,
+                        embeddings=embeddings_est,
+                        message=f"Indexed {processed:,} of {total:,} customers",
+                    )
+
+                # Create sync wrapper for async callback
+                def sync_progress(processed: int, total: int):
+                    asyncio.create_task(on_progress(processed, total))
+
+                result = await _vector_index.index_customers(
+                    _db.customers,
+                    batch_size=100,
+                    progress_callback=sync_progress,
+                )
+
+                await _progress_tracker.complete_operation(
+                    op_id,
+                    success=True,
+                    message=f"Indexed {result.get('indexed', 0):,} customers ({result.get('errors', 0)} errors)",
+                )
+            except Exception as e:
+                await _progress_tracker.complete_operation(
+                    op_id,
+                    success=False,
+                    error=str(e),
+                )
+
+        # Start background task
+        asyncio.create_task(run_reindex())
+
+        return {
+            "success": True,
+            "async": True,
+            "operation_id": op_id,
+            "total_items": db_count,
+            "stream_url": f"/api/data/reindex/stream/{op_id}",
+            "status_url": f"/api/data/reindex/status/{op_id}",
+        }
+
+    # Synchronous mode (original behavior)
     if force:
         await _vector_index.delete_customer_index()
-        await _cache.clear()  # Clear cache too
-    
-    # Reindex
+        await _cache.clear()
+
     result = await _vector_index.index_customers(_db.customers, batch_size=100)
-    
+
     return {
         "success": True,
         "indexed": result.get("indexed", 0),
@@ -678,6 +827,67 @@ async def reindex_customer_data(force: bool = False):
         "previous_count": indexed_count,
         "db_count": db_count,
         "available_states": _db.get_available_states()
+    }
+
+
+@app.get("/api/data/reindex/stream/{operation_id}")
+async def stream_reindex_progress(operation_id: str):
+    """Stream reindex progress via Server-Sent Events.
+
+    Connect to this endpoint to receive real-time progress updates.
+    Events: 'progress' (ongoing), 'complete' (finished), 'error' (failed)
+    """
+    if not _progress_tracker:
+        return {"success": False, "error": "Progress tracking not available"}
+
+    async def event_stream():
+        async for event in _progress_tracker.stream_progress(operation_id):
+            yield event
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
+
+
+@app.get("/api/data/reindex/status/{operation_id}")
+async def get_reindex_status(operation_id: str):
+    """Get current status of a reindex operation."""
+    if not _progress_tracker:
+        return {"success": False, "error": "Progress tracking not available"}
+
+    state = await _progress_tracker.get_progress(operation_id)
+    if not state:
+        return {"success": False, "error": "Operation not found"}
+
+    return {
+        "success": True,
+        "operation": state.to_dict(),
+        "formatted": {
+            "elapsed": format_duration(state.elapsed_seconds),
+            "remaining": format_duration(state.estimated_remaining_seconds) if state.estimated_remaining_seconds > 0 else "calculating...",
+            "data_processed": format_bytes(state.bytes_processed),
+            "rate": f"{state.items_per_second:.0f} items/sec" if state.items_per_second > 0 else "starting...",
+        },
+    }
+
+
+@app.get("/api/data/reindex/active")
+async def get_active_reindex_operations():
+    """Get all active reindex operations."""
+    if not _progress_tracker:
+        return {"success": False, "error": "Progress tracking not available", "operations": []}
+
+    operations = await _progress_tracker.get_active_operations()
+    return {
+        "success": True,
+        "operations": [op.to_dict() for op in operations],
+        "count": len(operations),
     }
 
 
@@ -702,29 +912,66 @@ async def list_knowledge_documents(category: Optional[str] = None, limit: int = 
 async def upload_knowledge_document(
     file: UploadFile = File(...),
     tags: Optional[str] = Form(None),
-    category: str = Form("general")
+    category: str = Form("uploaded")
 ):
-    """Upload a document to the knowledge base."""
+    """Upload and persist a document to the knowledge base."""
+    global _index_state
+
     if not _knowledge or not _knowledge.available:
         return {"success": False, "error": "Knowledge base not available"}
 
-    tag_list = [t.strip() for t in (tags or "").split(",") if t.strip()]
-    suffix = Path(file.filename).suffix
+    # Ensure upload directory exists
+    KNOWLEDGE_UPLOADED_DIR.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        shutil.copyfileobj(file.file, tmp)
-        tmp_path = Path(tmp.name)
+    # Generate unique filename (handle duplicates)
+    original_name = Path(file.filename).name
+    target_path = KNOWLEDGE_UPLOADED_DIR / original_name
+    if target_path.exists():
+        stem = target_path.stem
+        suffix = target_path.suffix
+        counter = 1
+        while target_path.exists():
+            target_path = KNOWLEDGE_UPLOADED_DIR / f"{stem}_{counter}{suffix}"
+            counter += 1
+
+    # Write file permanently
+    with open(target_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    tag_list = [t.strip() for t in (tags or "").split(",") if t.strip()]
+    relative_path = str(target_path.relative_to(KNOWLEDGE_DIR)).replace("\\", "/")
 
     try:
+        # Compute hash and index
+        content_hash = compute_file_hash(target_path)
+
         result = await _knowledge.index_document(
-            content=tmp_path,
-            filename=file.filename,
+            content=target_path,
+            filename=relative_path,
             tags=tag_list,
             category=category
         )
-        return result
-    finally:
-        tmp_path.unlink(missing_ok=True)
+
+        # Update index state
+        if result.get("success") and _index_state is not None:
+            update_file_state(
+                _index_state,
+                relative_path,
+                result.get("doc_id", ""),
+                content_hash,
+                result.get("chunks_indexed", 0)
+            )
+            save_index_state(INDEX_STATE_FILE, _index_state)
+
+        return {
+            **result,
+            "persisted_path": relative_path,
+            "content_hash": content_hash
+        }
+    except Exception as e:
+        # Clean up file on failure
+        target_path.unlink(missing_ok=True)
+        return {"success": False, "error": str(e)}
 
 
 @app.post("/api/knowledge/upload-text")
@@ -787,17 +1034,37 @@ async def delete_knowledge_document(doc_id: str):
 
 @app.post("/api/knowledge/reindex")
 async def reindex_knowledge_documents(force: bool = False):
-    """Manually trigger re-indexing of knowledge documents."""
+    """
+    Manually trigger re-indexing of knowledge documents.
+
+    Args:
+        force: If True, delete all documents and reindex everything.
+               If False, only index new/modified files (incremental).
+    """
+    global _index_state
+
     if not _knowledge or not _knowledge.available:
         return {"success": False, "error": "Knowledge base not available"}
 
     if force:
+        # Delete all documents and clear index state
         docs = await _knowledge.list_documents(limit=1000)
+        deleted = 0
         for doc in docs:
             await _knowledge.delete_document(doc["doc_id"])
+            deleted += 1
+        # Clear index state for full reindex
+        from icda.knowledge_index_state import create_empty_state, mark_full_reindex
+        _index_state = create_empty_state()
+        mark_full_reindex(_index_state)
+        print(f"  Force reindex: deleted {deleted} documents")
 
-    result = await auto_index_knowledge_documents(_knowledge)
-    return {"success": True, **result}
+    # Reload state for incremental reindex
+    if _index_state is None:
+        _index_state = load_index_state(INDEX_STATE_FILE)
+
+    result = await auto_index_knowledge_documents(_knowledge, _index_state)
+    return {"success": True, "mode": "full" if force else "incremental", **result}
 
 
 # ==================== Admin API ====================
@@ -1072,7 +1339,8 @@ async def admin_trigger_reindex(index_name: str = "all"):
 
     if index_name in ("all", "knowledge"):
         if _knowledge and _knowledge.available:
-            result = await auto_index_knowledge_documents(_knowledge)
+            state = load_index_state(INDEX_STATE_FILE) if _index_state is None else _index_state
+            result = await auto_index_knowledge_documents(_knowledge, state)
             results["knowledge"] = result
         else:
             results["knowledge"] = {"error": "Not available"}

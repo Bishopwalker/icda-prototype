@@ -11,7 +11,6 @@ import {
   Typography,
   Chip,
   LinearProgress,
-  Button,
   Alert,
   Skeleton,
   IconButton,
@@ -28,9 +27,10 @@ import {
 import { alpha } from '@mui/material/styles';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip } from 'recharts';
 
-import { getIndexStats, getIndexHealth, getEnforcerMetrics, triggerReindex } from '../../../services/adminApi';
+import { getIndexStats, getIndexHealth, getEnforcerMetrics } from '../../../services/adminApi';
 import type { IndexStats, IndexHealth, EnforcerMetrics } from '../../../types/admin';
 import { colors } from '../../../theme';
+import ReindexProgress from './ReindexProgress';
 
 const CHART_COLORS = ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899'];
 
@@ -79,7 +79,6 @@ function IndexDashboard() {
   const [health, setHealth] = useState<IndexHealth | null>(null);
   const [enforcer, setEnforcer] = useState<EnforcerMetrics | null>(null);
   const [loading, setLoading] = useState(true);
-  const [reindexing, setReindexing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
@@ -105,18 +104,6 @@ function IndexDashboard() {
   useEffect(() => {
     fetchData();
   }, []);
-
-  const handleReindex = async () => {
-    setReindexing(true);
-    try {
-      await triggerReindex('all');
-      await fetchData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Reindex failed');
-    } finally {
-      setReindexing(false);
-    }
-  };
 
   const categoryData = stats?.knowledge?.categories
     ? Object.entries(stats.knowledge.categories).map(([name, value]) => ({ name, value }))
@@ -145,17 +132,11 @@ function IndexDashboard() {
               <RefreshIcon />
             </IconButton>
           </Tooltip>
-          <Button
-            variant="contained"
-            onClick={handleReindex}
-            disabled={reindexing}
-            startIcon={reindexing ? <RefreshIcon className="spin" /> : <StorageIcon />}
-            sx={{ ml: 1 }}
-          >
-            {reindexing ? 'Reindexing...' : 'Reindex All'}
-          </Button>
         </Box>
       </Box>
+
+      {/* Customer Reindex with Progress Tracking */}
+      <ReindexProgress onComplete={fetchData} />
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 

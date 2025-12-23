@@ -180,3 +180,155 @@ export async function validateIndex(): Promise<{ success: boolean; report?: Inde
   const { data } = await api.post('/enforcer/validate-index');
   return data;
 }
+
+// ==================== Progress Tracking ====================
+
+export interface ProgressState {
+  operation_id: string;
+  operation_type: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  total_items: number;
+  processed_items: number;
+  error_count: number;
+  current_batch: number;
+  total_batches: number;
+  bytes_processed: number;
+  context_tokens_used: number;
+  embeddings_generated: number;
+  start_time: number;
+  last_update: number;
+  elapsed_seconds: number;
+  estimated_remaining_seconds: number;
+  items_per_second: number;
+  current_phase: string;
+  last_message: string;
+  error_message: string;
+  percent_complete: number;
+}
+
+export interface ReindexResponse {
+  success: boolean;
+  async?: boolean;
+  operation_id?: string;
+  total_items?: number;
+  stream_url?: string;
+  status_url?: string;
+  indexed?: number;
+  errors?: number;
+  previous_count?: number;
+  db_count?: number;
+  message?: string;
+  error?: string;
+}
+
+export interface ProgressStatusResponse {
+  success: boolean;
+  operation?: ProgressState;
+  formatted?: {
+    elapsed: string;
+    remaining: string;
+    data_processed: string;
+    rate: string;
+  };
+  error?: string;
+}
+
+/**
+ * Start a customer data reindex operation with real-time progress tracking.
+ */
+export async function startReindexWithProgress(
+  force: boolean = false
+): Promise<ReindexResponse> {
+  const { data } = await axios.post('/api/data/reindex', null, {
+    params: { force, async_mode: true },
+  });
+  return data;
+}
+
+/**
+ * Start a synchronous reindex (original behavior, no progress tracking).
+ */
+export async function startReindexSync(force: boolean = false): Promise<ReindexResponse> {
+  const { data } = await axios.post('/api/data/reindex', null, {
+    params: { force, async_mode: false },
+  });
+  return data;
+}
+
+/**
+ * Get the current status of a reindex operation.
+ */
+export async function getReindexStatus(operationId: string): Promise<ProgressStatusResponse> {
+  const { data } = await axios.get(`/api/data/reindex/status/${operationId}`);
+  return data;
+}
+
+/**
+ * Get all currently active reindex operations.
+ */
+export async function getActiveOperations(): Promise<{
+  success: boolean;
+  operations: ProgressState[];
+  count: number;
+}> {
+  const { data } = await axios.get('/api/data/reindex/active');
+  return data;
+}
+
+/**
+ * Create an EventSource for real-time progress streaming.
+ * Returns the stream URL and a helper to create the EventSource.
+ */
+export function createProgressStream(operationId: string): {
+  url: string;
+  connect: (
+    onProgress: (state: ProgressState) => void,
+    onComplete: (state: ProgressState) => void,
+    onError: (error: string) => void
+  ) => EventSource;
+} {
+  const url = `/api/data/reindex/stream/${operationId}`;
+
+  return {
+    url,
+    connect: (onProgress, onComplete, onError) => {
+      const eventSource = new EventSource(url);
+
+      eventSource.addEventListener('progress', (event) => {
+        try {
+          const data = JSON.parse((event as MessageEvent).data);
+          onProgress(data);
+        } catch (e) {
+          console.error('Failed to parse progress event:', e);
+        }
+      });
+
+      eventSource.addEventListener('complete', (event) => {
+        try {
+          const data = JSON.parse((event as MessageEvent).data);
+          onComplete(data);
+          eventSource.close();
+        } catch (e) {
+          console.error('Failed to parse complete event:', e);
+        }
+      });
+
+      eventSource.addEventListener('error', (event) => {
+        try {
+          const data = JSON.parse((event as MessageEvent).data);
+          onError(data.error || 'Unknown error');
+        } catch {
+          onError('Connection error');
+        }
+        eventSource.close();
+      });
+
+      eventSource.onerror = () => {
+        onError('Connection lost');
+        eventSource.close();
+      };
+
+      return eventSource;
+    },
+  };
+}
