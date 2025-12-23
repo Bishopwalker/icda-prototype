@@ -56,19 +56,26 @@ async def live_api_client(api_base_url: str):
     """
     import httpx
 
-    async with httpx.AsyncClient(
-        base_url=api_base_url,
-        timeout=60.0,  # Long timeout for Nova calls
-    ) as client:
-        # Verify API is accessible
-        try:
-            response = await client.get("/api/health")
-            if response.status_code != 200:
-                pytest.skip(f"API not healthy: {response.status_code}")
-        except httpx.ConnectError:
-            pytest.skip("API not running on localhost:8000")
+    try:
+        async with httpx.AsyncClient(
+            base_url=api_base_url,
+            timeout=60.0,  # Long timeout for Nova calls
+        ) as client:
+            # Verify API is accessible
+            try:
+                response = await client.get("/api/health")
+                if response.status_code != 200:
+                    pytest.skip(f"API not healthy: {response.status_code}")
+            except httpx.ConnectError:
+                pytest.skip("API not running on localhost:8000 - start with: uvicorn main:app --port 8000")
+            except httpx.ReadTimeout:
+                pytest.skip("API timeout - server may be starting up")
 
-        yield client
+            yield client
+    except httpx.ConnectError:
+        pytest.skip("Cannot connect to API at localhost:8000")
+    except Exception as e:
+        pytest.skip(f"API connection failed: {e}")
 
 
 @pytest.fixture

@@ -2,7 +2,7 @@
 
 Includes:
 - Address verification orchestrator (5-agent pipeline)
-- Query orchestrator (8-agent pipeline)
+- Query orchestrator (11-agent pipeline with memory, personality, suggestions)
 - All individual agents
 """
 
@@ -22,6 +22,11 @@ from .knowledge_agent import KnowledgeAgent
 from .nova_agent import NovaAgent
 from .enforcer_agent import EnforcerAgent
 
+# New agents for memory, personality, and suggestions
+from .memory_agent import MemoryAgent
+from .personality_agent import PersonalityAgent
+from .suggestion_agent import SuggestionAgent
+
 # Tool registry
 from .tool_registry import ToolRegistry, ToolSpec, ToolCategory, create_default_registry
 
@@ -31,6 +36,8 @@ from .models import (
     ResponseStatus,
     QualityGate,
     SearchStrategy,
+    SuggestionType,
+    PersonalityStyle,
     IntentResult,
     QueryContext,
     ParsedQuery,
@@ -43,6 +50,13 @@ from .models import (
     PipelineStage,
     PipelineTrace,
     QueryResult,
+    # Memory and personality models
+    MemoryEntity,
+    MemoryContext,
+    Suggestion,
+    SuggestionContext,
+    PersonalityConfig,
+    PersonalityContext,
 )
 
 __all__ = [
@@ -50,7 +64,7 @@ __all__ = [
     "AddressAgentOrchestrator",
     "QueryOrchestrator",
     "create_query_orchestrator",
-    # Agents
+    # Core agents
     "IntentAgent",
     "ContextAgent",
     "ParserAgent",
@@ -59,6 +73,10 @@ __all__ = [
     "KnowledgeAgent",
     "NovaAgent",
     "EnforcerAgent",
+    # New agents
+    "MemoryAgent",
+    "PersonalityAgent",
+    "SuggestionAgent",
     # Tool registry
     "ToolRegistry",
     "ToolSpec",
@@ -69,6 +87,8 @@ __all__ = [
     "ResponseStatus",
     "QualityGate",
     "SearchStrategy",
+    "SuggestionType",
+    "PersonalityStyle",
     "IntentResult",
     "QueryContext",
     "ParsedQuery",
@@ -81,4 +101,10 @@ __all__ = [
     "PipelineStage",
     "PipelineTrace",
     "QueryResult",
+    "MemoryEntity",
+    "MemoryContext",
+    "Suggestion",
+    "SuggestionContext",
+    "PersonalityConfig",
+    "PersonalityContext",
 ]

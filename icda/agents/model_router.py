@@ -5,6 +5,15 @@ Routes queries to the appropriate Nova model (Micro/Lite/Pro) based on:
 2. Agent confidence scores
 3. Multi-part query detection
 4. SQL complexity indicators
+
+ROUTING DECISION TREE:
+1. COMPLEX queries or analysis intents → Nova Pro
+2. Low confidence from any agent → Nova Pro (needs reasoning power)
+3. Multi-part queries → Nova Pro
+4. SQL aggregation/analytics → Nova Pro
+5. Large result sets (>100) → Nova Lite (good summarization)
+6. MEDIUM complexity → Nova Lite
+7. SIMPLE queries → Nova Micro (fast, cheap)
 """
 
 import logging
@@ -51,7 +60,7 @@ class ModelRouter:
     4. SQL aggregation keywords → Nova Pro
     5. Large result sets (>100) → Nova Lite (better summarization)
     6. MEDIUM complexity → Nova Lite
-    7. Otherwise → Nova Micro
+    7. Otherwise → Nova Micro (fast path)
     """
 
     __slots__ = (
@@ -81,6 +90,11 @@ class ModelRouter:
         self._pro_model = pro_model
         self._threshold = confidence_threshold
 
+        logger.info(
+            f"ModelRouter initialized: micro={micro_model}, lite={lite_model}, "
+            f"pro={pro_model}, threshold={confidence_threshold}"
+        )
+
     def route(
         self,
         intent: IntentResult,
@@ -99,45 +113,54 @@ class ModelRouter:
         Returns:
             ModelRoutingDecision with model selection and reasoning.
         """
-        reasons = []
+        pro_reasons = []
+        lite_reasons = []
+
+        # =========================================================================
+        # PRO-TIER CHECKS - These need maximum reasoning capability
+        # =========================================================================
 
         # Rule 1: Complex query complexity
         if intent.complexity == QueryComplexity.COMPLEX:
-            reasons.append("complexity=COMPLEX")
+            pro_reasons.append("complexity=COMPLEX")
 
-        # Rule 2: Complex intent type
+        # Rule 2: Complex intent type (analysis, comparison, recommendation)
         if intent.primary_intent in COMPLEX_INTENTS:
-            reasons.append(f"intent={intent.primary_intent.value}")
+            pro_reasons.append(f"intent={intent.primary_intent.value}")
 
-        # Rule 3: Low intent confidence
+        # Rule 3: Low intent confidence - uncertain = need Pro
         if intent.confidence < self._threshold:
-            reasons.append(f"intent_confidence={intent.confidence:.2f}")
+            pro_reasons.append(f"intent_confidence={intent.confidence:.2f}")
 
         # Rule 4: Low confidence from any prior agent
         if agent_confidences:
             low_conf = [c for c in agent_confidences if c < self._threshold]
             if low_conf:
                 min_conf = min(low_conf)
-                reasons.append(f"low_agent_confidence={min_conf:.2f}")
+                pro_reasons.append(f"low_agent_confidence={min_conf:.2f}")
 
         # Rule 5: Multi-part query detection
         if parsed and self._is_multipart_query(parsed):
-            reasons.append("multipart_query")
+            pro_reasons.append("multipart_query")
 
         # Rule 6: SQL complexity indicators
         if self._has_sql_complexity(intent, parsed):
-            reasons.append("sql_complexity")
+            pro_reasons.append("sql_complexity")
 
-        # If any Pro reasons found, use Lite model (Pro may not be available)
-        # This is a fallback - Pro requires special AWS access
-        if reasons:
-            logger.info(f"ModelRouter: Nova Lite selected (Pro triggers) - {'; '.join(reasons)}")
+        # If any Pro reasons found, use Pro
+        if pro_reasons:
+            reason_str = "; ".join(pro_reasons)
+            logger.info(f"ModelRouter: Nova Pro selected - {reason_str}")
             return ModelRoutingDecision(
-                model_id=self._lite_model,
-                model_tier=ModelTier.LITE,
-                reason="; ".join(reasons),
+                model_id=self._pro_model,
+                model_tier=ModelTier.PRO,
+                reason=reason_str,
                 confidence_factor=intent.confidence,
             )
+
+        # =========================================================================
+        # LITE-TIER CHECKS - Medium complexity or special handling
+        # =========================================================================
 
         # Rule 7: Large result sets need better summarization
         if search_result and search_result.total_matches > 100:
@@ -161,12 +184,15 @@ class ModelRouter:
                 confidence_factor=intent.confidence,
             )
 
-        # Default: Simple queries use Lite (Micro has content filter issues)
-        reason = "standard_complexity"
-        logger.info(f"ModelRouter: Nova Lite selected - {reason}")
+        # =========================================================================
+        # MICRO-TIER - Simple, high-confidence queries (fast path)
+        # =========================================================================
+
+        reason = "complexity=SIMPLE"
+        logger.info(f"ModelRouter: Nova Micro selected - {reason}")
         return ModelRoutingDecision(
-            model_id=self._lite_model,
-            model_tier=ModelTier.LITE,
+            model_id=self._micro_model,
+            model_tier=ModelTier.MICRO,
             reason=reason,
             confidence_factor=intent.confidence,
         )

@@ -58,6 +58,228 @@ class ModelTier(str, Enum):
     FALLBACK = "fallback"
 
 
+class SuggestionType(str, Enum):
+    """Types of suggestions the SuggestionAgent can generate."""
+    TYPO_FIX = "typo_fix"               # "Did you mean 'California'?"
+    QUERY_REFINEMENT = "refinement"      # "Try adding a state filter"
+    FOLLOW_UP = "follow_up"              # "Show their addresses"
+    DISAMBIGUATION = "disambiguate"      # "Multiple customers named John"
+    FILTER_SUGGESTION = "filter_add"     # "Add 'high movers' filter"
+    RESULT_EXPANSION = "expansion"       # "Try neighboring states?"
+
+
+class PersonalityStyle(str, Enum):
+    """Personality styles for response generation."""
+    WITTY_EXPERT = "witty_expert"        # Clever and knowledgeable
+    FRIENDLY_PROFESSIONAL = "friendly"   # Warm but businesslike
+    CASUAL_FUN = "casual"                # Playful with emojis
+    MINIMAL = "minimal"                  # Subtle warmth only
+
+
+# ============================================================================
+# Memory and Personality Dataclasses
+# ============================================================================
+
+@dataclass(slots=True)
+class MemoryEntity:
+    """A remembered entity from conversation.
+
+    Attributes:
+        entity_id: Unique identifier (CRID, name, etc.).
+        entity_type: Type of entity (customer, location, preference).
+        canonical_name: Primary reference name.
+        aliases: Alternative references ("that customer", "him").
+        attributes: Stored attributes (state, moves, etc.).
+        first_mentioned: Timestamp when first mentioned.
+        last_accessed: Timestamp of last access (for LRU).
+        mention_count: How many times referenced.
+        confidence: How sure we are this is the entity.
+    """
+    entity_id: str
+    entity_type: str
+    canonical_name: str
+    aliases: list[str] = field(default_factory=list)
+    attributes: dict[str, Any] = field(default_factory=dict)
+    first_mentioned: float = 0.0
+    last_accessed: float = 0.0
+    mention_count: int = 1
+    confidence: float = 0.8
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary representation."""
+        return {
+            "entity_id": self.entity_id,
+            "entity_type": self.entity_type,
+            "canonical_name": self.canonical_name,
+            "aliases": self.aliases,
+            "attributes": self.attributes,
+            "first_mentioned": self.first_mentioned,
+            "last_accessed": self.last_accessed,
+            "mention_count": self.mention_count,
+            "confidence": self.confidence,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "MemoryEntity":
+        """Create from dictionary."""
+        return cls(
+            entity_id=data["entity_id"],
+            entity_type=data["entity_type"],
+            canonical_name=data["canonical_name"],
+            aliases=data.get("aliases", []),
+            attributes=data.get("attributes", {}),
+            first_mentioned=data.get("first_mentioned", 0.0),
+            last_accessed=data.get("last_accessed", 0.0),
+            mention_count=data.get("mention_count", 1),
+            confidence=data.get("confidence", 0.8),
+        )
+
+
+@dataclass(slots=True)
+class MemoryContext:
+    """Result from MemoryAgent retrieval.
+
+    Attributes:
+        recalled_entities: Entities recalled from memory.
+        active_customer: The customer currently being discussed.
+        active_location: Current geographic focus (state, city).
+        user_preferences: Learned user preferences.
+        resolved_pronouns: Pronoun to entity mappings.
+        recall_confidence: Confidence in memory recall.
+        memory_signals: Debug info about recall process.
+    """
+    recalled_entities: list[MemoryEntity] = field(default_factory=list)
+    active_customer: MemoryEntity | None = None
+    active_location: dict[str, str] | None = None
+    user_preferences: dict[str, Any] = field(default_factory=dict)
+    resolved_pronouns: dict[str, str] = field(default_factory=dict)
+    recall_confidence: float = 0.0
+    memory_signals: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary representation."""
+        return {
+            "recalled_entities": [e.to_dict() for e in self.recalled_entities],
+            "active_customer": self.active_customer.to_dict() if self.active_customer else None,
+            "active_location": self.active_location,
+            "user_preferences": self.user_preferences,
+            "resolved_pronouns": self.resolved_pronouns,
+            "recall_confidence": self.recall_confidence,
+            "memory_signals": self.memory_signals,
+        }
+
+
+@dataclass(slots=True)
+class Suggestion:
+    """A single suggestion for query improvement.
+
+    Attributes:
+        suggestion_type: Type of suggestion.
+        original: What triggered the suggestion.
+        suggested: The suggested correction/action.
+        reason: Why this is suggested.
+        confidence: Confidence in the suggestion.
+        action_query: Ready-to-execute query if applicable.
+    """
+    suggestion_type: SuggestionType
+    original: str
+    suggested: str
+    reason: str
+    confidence: float = 0.7
+    action_query: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary representation."""
+        result = {
+            "type": self.suggestion_type.value,
+            "original": self.original,
+            "suggested": self.suggested,
+            "reason": self.reason,
+            "confidence": self.confidence,
+        }
+        if self.action_query:
+            result["action_query"] = self.action_query
+        return result
+
+
+@dataclass(slots=True)
+class SuggestionContext:
+    """Result from SuggestionAgent.
+
+    Attributes:
+        suggestions: List of suggestions (max 3).
+        primary_suggestion: The most important suggestion.
+        follow_up_prompts: Quick follow-up options.
+        suggestion_confidence: Overall confidence.
+    """
+    suggestions: list[Suggestion] = field(default_factory=list)
+    primary_suggestion: Suggestion | None = None
+    follow_up_prompts: list[str] = field(default_factory=list)
+    suggestion_confidence: float = 0.0
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary representation."""
+        return {
+            "suggestions": [s.to_dict() for s in self.suggestions],
+            "primary_suggestion": self.primary_suggestion.to_dict() if self.primary_suggestion else None,
+            "follow_up_prompts": self.follow_up_prompts,
+            "suggestion_confidence": self.suggestion_confidence,
+        }
+
+
+@dataclass(slots=True)
+class PersonalityConfig:
+    """Configuration for personality agent.
+
+    Attributes:
+        style: Personality style to use.
+        warmth_level: How warm to be (0=clinical, 1=very warm).
+        humor_enabled: Whether to add appropriate humor.
+        empathy_enabled: Whether to show empathy on failures.
+    """
+    style: PersonalityStyle = PersonalityStyle.WITTY_EXPERT
+    warmth_level: float = 0.7
+    humor_enabled: bool = True
+    empathy_enabled: bool = True
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary representation."""
+        return {
+            "style": self.style.value,
+            "warmth_level": self.warmth_level,
+            "humor_enabled": self.humor_enabled,
+            "empathy_enabled": self.empathy_enabled,
+        }
+
+
+@dataclass(slots=True)
+class PersonalityContext:
+    """Result from PersonalityAgent enhancement.
+
+    Attributes:
+        enhanced_response: Response with personality applied.
+        original_response: Original unmodified response.
+        personality_applied: Whether personality was applied.
+        enhancements_made: List of enhancements made.
+        tone_score: Warmth level of final response.
+    """
+    enhanced_response: str
+    original_response: str
+    personality_applied: bool = True
+    enhancements_made: list[str] = field(default_factory=list)
+    tone_score: float = 0.5
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary representation."""
+        return {
+            "enhanced_response": self.enhanced_response,
+            "original_response": self.original_response,
+            "personality_applied": self.personality_applied,
+            "enhancements_made": self.enhancements_made,
+            "tone_score": self.tone_score,
+        }
+
+
 # ============================================================================
 # Token and Pagination Dataclasses
 # ============================================================================
@@ -215,6 +437,9 @@ class QueryContext:
         prior_results: Last query results for follow-ups.
         is_follow_up: Whether this is a follow-up question.
         context_confidence: Confidence in extracted context.
+        memory_entities: Entity IDs from memory recall.
+        resolved_pronouns: Pronoun to entity mappings from memory.
+        memory_confidence: Confidence from memory recall.
     """
     session_history: list[dict[str, Any]] = field(default_factory=list)
     referenced_entities: list[str] = field(default_factory=list)
@@ -223,6 +448,10 @@ class QueryContext:
     prior_results: list[dict[str, Any]] | None = None
     is_follow_up: bool = False
     context_confidence: float = 0.0
+    # Memory integration fields
+    memory_entities: list[str] = field(default_factory=list)
+    resolved_pronouns: dict[str, str] = field(default_factory=dict)
+    memory_confidence: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation."""
@@ -232,6 +461,9 @@ class QueryContext:
             "geographic_context": self.geographic_context,
             "is_follow_up": self.is_follow_up,
             "context_confidence": self.context_confidence,
+            "memory_entities": self.memory_entities,
+            "resolved_pronouns": self.resolved_pronouns,
+            "memory_confidence": self.memory_confidence,
         }
 
 

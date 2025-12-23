@@ -294,7 +294,11 @@ class Router:
         if kwargs.get("trace") is not None:
             trace = kwargs["trace"]
             # Convert to dict if it's a PipelineTrace object
-            result["trace"] = trace.to_dict() if hasattr(trace, "to_dict") else trace
+            trace_dict = trace.to_dict() if hasattr(trace, "to_dict") else trace
+            result["trace"] = trace_dict
+            
+            # Extract complexity_metrics for prominent display
+            result["complexity_metrics"] = self._extract_complexity_metrics(trace_dict)
 
         if kwargs.get("model_used"):
             result["model_used"] = kwargs["model_used"]
@@ -310,3 +314,99 @@ class Router:
             result["results"] = kwargs["results"]
 
         return result
+
+    def _extract_complexity_metrics(self, trace_dict: dict) -> dict:
+        """Extract complexity metrics from pipeline trace for prominent display.
+
+        Args:
+            trace_dict: Pipeline trace as dictionary.
+
+        Returns:
+            Complexity metrics dict with routing decision info.
+        """
+        # Extract model routing decision
+        routing = trace_dict.get("model_routing_decision", {})
+        
+        # Extract intent stage info
+        intent_info = {}
+        for stage in trace_dict.get("stages", []):
+            if stage.get("agent") == "intent":
+                output = stage.get("output", {})
+                intent_info = {
+                    "complexity": output.get("complexity", "unknown"),
+                    "primary_intent": output.get("primary_intent", "unknown"),
+                    "intent_confidence": output.get("confidence", 0),
+                }
+                break
+        
+        # Collect all agent confidences
+        agent_confidences = {}
+        for stage in trace_dict.get("stages", []):
+            conf = stage.get("confidence")
+            if conf is not None:
+                agent_confidences[stage.get("agent", "unknown")] = conf
+        
+        # Build complexity metrics
+        metrics = {
+            # Model selection
+            "model_tier": routing.get("model_tier", "unknown"),
+            "model_id": routing.get("model_id", "unknown"),
+            "routing_reason": routing.get("reason", "unknown"),
+            
+            # Query analysis
+            "query_complexity": intent_info.get("complexity", "unknown"),
+            "primary_intent": intent_info.get("primary_intent", "unknown"),
+            
+            # Confidence scores
+            "intent_confidence": intent_info.get("intent_confidence", 0),
+            "min_confidence": trace_dict.get("min_confidence"),
+            "agent_confidences": agent_confidences,
+            
+            # Thresholds (from routing decision)
+            "confidence_threshold": 0.6,  # Default threshold
+            
+            # Escalation triggers (parsed from routing_reason)
+            "escalation_triggers": self._parse_escalation_triggers(routing.get("reason", "")),
+        }
+        
+        return metrics
+
+    def _parse_escalation_triggers(self, reason: str) -> list[str]:
+        """Parse escalation triggers from routing reason string.
+
+        Args:
+            reason: Routing reason string (e.g., "complexity=COMPLEX; intent=ANALYSIS")
+
+        Returns:
+            List of trigger descriptions.
+        """
+        if not reason or reason == "unknown":
+            return []
+        
+        triggers = []
+        parts = reason.split("; ")
+        
+        for part in parts:
+            if "complexity=COMPLEX" in part:
+                triggers.append("Complex query detected")
+            elif "complexity=MEDIUM" in part:
+                triggers.append("Medium complexity query")
+            elif "complexity=SIMPLE" in part:
+                triggers.append("Simple query (fast path)")
+            elif "intent=" in part:
+                intent = part.split("=")[1] if "=" in part else part
+                triggers.append(f"Intent requires reasoning: {intent}")
+            elif "low_agent_confidence" in part:
+                triggers.append("Low confidence from pipeline agents")
+            elif "intent_confidence" in part:
+                triggers.append("Uncertain query classification")
+            elif "multipart_query" in part:
+                triggers.append("Multi-part query detected")
+            elif "sql_complexity" in part:
+                triggers.append("SQL/analytics complexity keywords")
+            elif "large_results" in part:
+                triggers.append("Large result set needs summarization")
+            elif "standard_complexity" in part:
+                triggers.append("Standard query complexity")
+        
+        return triggers

@@ -50,7 +50,7 @@ class NovaClient:
 
     The orchestrated mode is enabled by default when available.
     """
-    __slots__ = ("client", "model", "available", "db", "_orchestrator", "_use_orchestrator", "_download_manager")
+    __slots__ = ("client", "model", "available", "db", "_orchestrator", "_use_orchestrator", "_download_manager", "_cache")
 
     _PROMPT = """You are ICDA, a customer data assistant. Be concise and helpful.
 
@@ -90,12 +90,14 @@ QUERY INTERPRETATION:
         llm_enforcer=None,
         use_orchestrator: bool = True,
         download_manager=None,
+        model_config: dict[str, Any] | None = None,
+        cache=None,
     ):
-        """Initialize NovaClient with optional 7-agent pipeline + LLM enforcer.
+        """Initialize NovaClient with optional 11-agent pipeline + LLM enforcer.
 
         Args:
             region: AWS region for Bedrock.
-            model: Bedrock model ID.
+            model: Bedrock model ID (base/micro model).
             db: CustomerDB instance.
             vector_index: Optional VectorIndex for semantic search.
             knowledge: Optional KnowledgeManager for RAG.
@@ -103,8 +105,13 @@ QUERY INTERPRETATION:
             session_store: Optional session store for context.
             guardrails: Optional Guardrails for PII filtering.
             llm_enforcer: Optional LLMEnforcer for AI-powered validation.
-            use_orchestrator: Whether to use 8-agent pipeline (default True).
+            use_orchestrator: Whether to use 11-agent pipeline (default True).
             download_manager: Optional DownloadTokenManager for pagination.
+            model_config: Optional model routing config with keys:
+                - nova_lite_model: Model ID for medium complexity
+                - nova_pro_model: Model ID for complex queries
+                - model_routing_threshold: Confidence threshold for escalation
+            cache: Optional RedisCache for memory storage.
         """
         self.model = model
         self.db = db
@@ -113,6 +120,7 @@ QUERY INTERPRETATION:
         self._orchestrator = None
         self._use_orchestrator = use_orchestrator
         self._download_manager = download_manager
+        self._cache = cache
 
         # Check if AWS credentials are available (supports default credential chain)
         try:
@@ -129,7 +137,7 @@ QUERY INTERPRETATION:
             self.available = True
             logger.info(f"Nova: Connected ({model})")
 
-            # Initialize 7-agent orchestrator + LLM enforcer if enabled
+            # Initialize 11-agent orchestrator + LLM enforcer if enabled
             if use_orchestrator:
                 try:
                     self._orchestrator = create_query_orchestrator(
@@ -143,9 +151,11 @@ QUERY INTERPRETATION:
                         guardrails=guardrails,
                         llm_enforcer=llm_enforcer,
                         download_manager=download_manager,
+                        config=model_config,  # Pass model routing config
+                        cache=cache,  # Pass cache for memory storage
                     )
                     enforcer_status = f"with {llm_enforcer.client.provider}" if (llm_enforcer and llm_enforcer.available) else "without enforcer"
-                    logger.info(f"Nova: 7-agent orchestrator enabled ({enforcer_status})")
+                    logger.info(f"Nova: 11-agent orchestrator enabled ({enforcer_status})")
                 except Exception as e:
                     logger.warning(f"Nova: Orchestrator init failed, using simple mode - {e}")
                     self._orchestrator = None

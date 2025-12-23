@@ -1,14 +1,17 @@
-"""Query Orchestrator - 8-Agent Query Processing Pipeline.
+"""Query Orchestrator - 11-Agent Query Processing Pipeline.
 
 Coordinates the full query processing pipeline:
 1. IntentAgent -> Classify query intent
-2. ContextAgent -> Extract session context
-3. ParserAgent -> Normalize and extract entities
-4. ResolverAgent -> Resolve references
-5. SearchAgent -> Execute search (parallel with 6)
-6. KnowledgeAgent -> RAG retrieval (parallel with 5)
-7. NovaAgent -> AI response generation
-8. EnforcerAgent -> Quality gates and validation
+2. MemoryAgent -> Recall entities from working memory (NEW)
+3. ContextAgent -> Extract session context (enhanced with memory)
+4. ParserAgent -> Normalize and extract entities
+5. ResolverAgent -> Resolve references
+6. SearchAgent -> Execute search (parallel with 7)
+7. KnowledgeAgent -> RAG retrieval (parallel with 6)
+8. NovaAgent -> AI response generation (enhanced with personality)
+9. EnforcerAgent -> Quality gates and validation
+10. PersonalityAgent -> Add warmth and wit to responses (NEW)
+11. SuggestionAgent -> Generate smart suggestions (NEW)
 
 Follows the enforcer pattern from address verification orchestrator.
 """
@@ -34,6 +37,10 @@ from .models import (
     TokenUsage,
     PaginationInfo,
     ModelRoutingDecision,
+    MemoryContext,
+    PersonalityConfig,
+    PersonalityContext,
+    SuggestionContext,
 )
 from .tool_registry import ToolRegistry, create_default_registry
 from .model_router import ModelRouter
@@ -45,17 +52,23 @@ from .search_agent import SearchAgent
 from .knowledge_agent import KnowledgeAgent
 from .nova_agent import NovaAgent
 from .enforcer_agent import EnforcerAgent
+from .memory_agent import MemoryAgent
+from .personality_agent import PersonalityAgent
+from .suggestion_agent import SuggestionAgent
 
 logger = logging.getLogger(__name__)
 
 
 class QueryOrchestrator:
-    """Orchestrates the 8-agent query processing pipeline.
+    """Orchestrates the 11-agent query processing pipeline.
 
     Coordinates data flow between agents, handles parallel execution,
     and provides comprehensive tracing for debugging.
 
     Enhanced features:
+    - Working memory for entity recall (MemoryAgent)
+    - Personality injection for witty responses (PersonalityAgent)
+    - Smart suggestions for follow-ups (SuggestionAgent)
     - Model routing (Micro/Lite/Pro) based on complexity and confidence
     - Token usage tracking across pipeline stages
     - Pagination for large result sets with download tokens
@@ -63,6 +76,7 @@ class QueryOrchestrator:
     """
     __slots__ = (
         "_intent_agent",
+        "_memory_agent",
         "_context_agent",
         "_parser_agent",
         "_resolver_agent",
@@ -70,11 +84,15 @@ class QueryOrchestrator:
         "_knowledge_agent",
         "_nova_agent",
         "_enforcer_agent",
+        "_personality_agent",
+        "_suggestion_agent",
         "_tool_registry",
         "_session_store",
         "_config",
         "_model_router",
         "_download_manager",
+        "_personality_config",
+        "_cache",
     )
 
     def __init__(
@@ -90,6 +108,7 @@ class QueryOrchestrator:
         llm_enforcer=None,
         config: dict[str, Any] | None = None,
         download_manager=None,
+        cache=None,
     ):
         """Initialize QueryOrchestrator with all agents.
 
@@ -105,10 +124,12 @@ class QueryOrchestrator:
             llm_enforcer: Optional LLMEnforcer for AI-powered validation.
             config: Optional configuration overrides.
             download_manager: Optional DownloadTokenManager for pagination.
+            cache: Optional RedisCache for memory storage.
         """
         self._config = config or {}
         self._session_store = session_store
         self._download_manager = download_manager
+        self._cache = cache
 
         # Create model router with configuration
         lite_model = self._config.get("nova_lite_model", "us.amazon.nova-lite-v1:0")
@@ -130,9 +151,13 @@ class QueryOrchestrator:
             address_orchestrator=address_orchestrator,
         )
 
-        # Initialize all 7 core agents + 1 LLM-powered enforcer
+        # Personality configuration (Witty Expert default)
+        self._personality_config = PersonalityConfig()
+
+        # Initialize all 11 agents (8 core + 3 new)
         # Each agent receives ONLY the context it needs (enforcer pattern)
         self._intent_agent = IntentAgent()
+        self._memory_agent = MemoryAgent(cache=cache)
         self._context_agent = ContextAgent(session_manager=session_store)
         self._parser_agent = ParserAgent()
         self._resolver_agent = ResolverAgent(db=db, vector_index=vector_index)
@@ -142,11 +167,14 @@ class QueryOrchestrator:
             region=region,
             model=model,
             tool_registry=self._tool_registry,
+            personality=self._personality_config,
         )
         self._enforcer_agent = EnforcerAgent(
             guardrails=guardrails,
             llm_enforcer=llm_enforcer,
         )
+        self._personality_agent = PersonalityAgent(config=self._personality_config)
+        self._suggestion_agent = SuggestionAgent()
 
         # Log initialization with enforcer status
         enforcer_status = f"enabled ({llm_enforcer.client.provider})" if (llm_enforcer and llm_enforcer.available) else "disabled"
@@ -154,6 +182,7 @@ class QueryOrchestrator:
             f"QueryOrchestrator initialized: {len(self._tool_registry.list_tools())} tools, LLM enforcer: {enforcer_status}"
         )
         logger.info(f"Model routing: micro={model}, lite={lite_model}, pro={pro_model}, threshold={threshold}")
+        logger.info("New agents: MemoryAgent, PersonalityAgent (Witty Expert), SuggestionAgent")
 
     @property
     def available(self) -> bool:
@@ -167,7 +196,19 @@ class QueryOrchestrator:
         session_id: str | None = None,
         trace_enabled: bool = True,
     ) -> QueryResult:
-        """Process a query through the 8-agent pipeline.
+        """Process a query through the 11-agent pipeline.
+
+        Pipeline stages:
+        1. IntentAgent - Classify query intent
+        2. MemoryAgent - Recall entities from working memory
+        3. ContextAgent - Extract session context (with memory)
+        4. ParserAgent - Normalize and extract entities
+        5. ResolverAgent - Resolve references
+        6/7. SearchAgent + KnowledgeAgent - Parallel execution
+        8. NovaAgent - AI response generation (with memory/personality)
+        9. EnforcerAgent - Quality gates and validation
+        10. PersonalityAgent - Add warmth and wit
+        11. SuggestionAgent - Generate smart suggestions
 
         Args:
             query: User query string.
@@ -188,18 +229,31 @@ class QueryOrchestrator:
                 trace,
             )
 
-            # Stage 2: Context Extraction
+            # Stage 2: Memory Recall (NEW)
+            # Recall entities from working memory for pronoun resolution
+            memory = await self._run_stage(
+                "memory",
+                lambda: self._memory_agent.recall(
+                    session_id=session_id,
+                    query=query,
+                    intent=intent,
+                ),
+                trace,
+            )
+
+            # Stage 3: Context Extraction (enhanced with memory)
             context = await self._run_stage(
                 "context",
                 lambda: self._context_agent.extract(
                     query=query,
                     session_id=session_id,
                     intent=intent,
+                    memory=memory,
                 ),
                 trace,
             )
 
-            # Stage 3: Query Parsing
+            # Stage 4: Query Parsing
             parsed = await self._run_stage(
                 "parser",
                 lambda: self._parser_agent.parse(
@@ -210,7 +264,7 @@ class QueryOrchestrator:
                 trace,
             )
 
-            # Stage 4: Entity Resolution
+            # Stage 5: Entity Resolution
             resolved = await self._run_stage(
                 "resolver",
                 lambda: self._resolver_agent.resolve(
@@ -220,7 +274,7 @@ class QueryOrchestrator:
                 trace,
             )
 
-            # Stage 5 & 6: Search + Knowledge (parallel)
+            # Stage 6 & 7: Search + Knowledge (parallel)
             search_result, knowledge = await self._run_parallel_stages(
                 search_coro=self._search_agent.search(
                     resolved=resolved,
@@ -244,7 +298,7 @@ class QueryOrchestrator:
                 knowledge.rag_confidence,
             ]
 
-            # Stage 7: Nova AI Generation (with model routing)
+            # Stage 8: Nova AI Generation (with model routing + memory)
             # Model router decides Micro/Lite/Pro based on complexity and confidence
             routing_decision = self._model_router.route(
                 intent=intent,
@@ -266,11 +320,12 @@ class QueryOrchestrator:
                     context=context,
                     intent=intent,
                     model_override=routing_decision.model_id,
+                    memory=memory,
                 ),
                 trace,
             )
 
-            # Stage 8: Enforcement
+            # Stage 9: Enforcement
             enforced = await self._run_stage(
                 "enforcer",
                 lambda: self._enforcer_agent.enforce(
@@ -281,6 +336,45 @@ class QueryOrchestrator:
                 ),
                 trace,
             )
+
+            # Stage 10: Personality Enhancement (NEW)
+            # Add warmth and wit to the response (Witty Expert style)
+            personality_ctx = await self._run_stage(
+                "personality",
+                lambda: self._personality_agent.enhance(
+                    response=enforced.final_response,
+                    query=query,
+                    intent=intent,
+                    search_result=search_result,
+                    memory=memory,
+                ),
+                trace,
+            )
+
+            # Stage 11: Suggestion Generation (NEW)
+            # Generate smart suggestions for follow-ups, corrections, refinements
+            suggestion_ctx = await self._run_stage(
+                "suggestions",
+                lambda: self._suggestion_agent.suggest(
+                    query=query,
+                    parsed=parsed,
+                    search_result=search_result,
+                    intent=intent,
+                    resolved=resolved,
+                ),
+                trace,
+            )
+
+            # Async: Store entities to memory for future recall (non-blocking)
+            if session_id and self._memory_agent.available:
+                asyncio.create_task(
+                    self._memory_agent.remember(
+                        session_id=session_id,
+                        results=search_result.results,
+                        response=personality_ctx.enhanced_response,
+                        query=query,
+                    )
+                )
 
             # Calculate total time
             total_ms = int((time.time() - start_time) * 1000)
@@ -296,7 +390,7 @@ class QueryOrchestrator:
                 await self._store_context(
                     session_id=session_id,
                     query=query,
-                    response=enforced.final_response,
+                    response=personality_ctx.enhanced_response,
                     intent=intent,
                     search_result=search_result,
                 )
@@ -323,7 +417,7 @@ class QueryOrchestrator:
 
             return QueryResult(
                 success=True,
-                response=enforced.final_response,
+                response=personality_ctx.enhanced_response,
                 route=self._determine_route(nova_response, enforced),
                 tools_used=nova_response.tools_used,
                 quality_score=enforced.quality_score,
@@ -336,6 +430,10 @@ class QueryOrchestrator:
                     "gates_passed": len(enforced.gates_passed),
                     "gates_failed": len(enforced.gates_failed),
                     "model_routing": routing_decision.to_dict(),
+                    "personality_applied": personality_ctx.personality_applied,
+                    "suggestions": [s.to_dict() for s in suggestion_ctx.suggestions],
+                    "follow_up_prompts": suggestion_ctx.follow_up_prompts,
+                    "memory_entities": len(memory.recalled_entities) if memory else 0,
                 },
                 token_usage=nova_response.token_usage,
                 pagination=pagination,
@@ -587,6 +685,7 @@ class QueryOrchestrator:
         return {
             "agents": {
                 "intent": self._intent_agent.available,
+                "memory": self._memory_agent.available,
                 "context": self._context_agent.available,
                 "parser": self._parser_agent.available,
                 "resolver": self._resolver_agent.available,
@@ -594,8 +693,16 @@ class QueryOrchestrator:
                 "knowledge": self._knowledge_agent.available,
                 "nova": self._nova_agent.available,
                 "enforcer": self._enforcer_agent.available,
+                "personality": self._personality_agent.available,
+                "suggestions": self._suggestion_agent.available,
             },
             "tools": self._tool_registry.get_stats(),
+            "personality_config": {
+                "style": self._personality_config.style.value,
+                "warmth_level": self._personality_config.warmth_level,
+                "humor_enabled": self._personality_config.humor_enabled,
+            },
+            "memory_stats": self._memory_agent.get_stats() if self._memory_agent.available else {},
         }
 
 
@@ -611,6 +718,7 @@ def create_query_orchestrator(
     llm_enforcer=None,
     config: dict[str, Any] | None = None,
     download_manager=None,
+    cache=None,
 ) -> QueryOrchestrator:
     """Factory function to create a QueryOrchestrator.
 
@@ -626,6 +734,7 @@ def create_query_orchestrator(
         llm_enforcer: Optional LLMEnforcer for AI-powered validation.
         config: Optional configuration dict for model routing settings.
         download_manager: Optional DownloadTokenManager for pagination.
+        cache: Optional RedisCache for memory storage.
 
     Returns:
         Configured QueryOrchestrator instance.
@@ -642,4 +751,5 @@ def create_query_orchestrator(
         llm_enforcer=llm_enforcer,
         config=config,
         download_manager=download_manager,
+        cache=cache,
     )

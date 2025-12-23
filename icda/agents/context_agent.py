@@ -6,13 +6,17 @@ This agent extracts relevant context from:
 3. Geographic context (state, city, zip from history)
 4. User preferences inferred from behavior
 5. Prior query results for follow-up detection
+6. Memory context (recalled entities and pronouns) - NEW
 """
 
 import logging
 import re
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from .models import IntentResult, QueryContext
+
+if TYPE_CHECKING:
+    from .models import MemoryContext
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +92,7 @@ class ContextAgent:
         session_id: str | None,
         query: str,
         intent: IntentResult,
+        memory: "MemoryContext | None" = None,
     ) -> QueryContext:
         """Extract context from session and query.
 
@@ -95,6 +100,7 @@ class ContextAgent:
             session_id: Session identifier.
             query: Current user query.
             intent: Classification result from IntentAgent.
+            memory: Optional memory context with recalled entities.
 
         Returns:
             QueryContext with extracted information.
@@ -117,9 +123,46 @@ class ContextAgent:
         # Detect if this is a follow-up question
         is_follow_up = self._detect_follow_up(query, history)
 
-        # Calculate context confidence
+        # Integrate memory context if available
+        memory_entities = []
+        resolved_pronouns = {}
+        memory_confidence = 0.0
+
+        if memory:
+            # Add memory entities to referenced entities
+            memory_entities = [e.entity_id for e in memory.recalled_entities]
+            referenced_entities = list(dict.fromkeys(
+                memory_entities + referenced_entities
+            ))
+
+            # Use memory's resolved pronouns
+            resolved_pronouns = memory.resolved_pronouns
+
+            # Update geographic context from memory if not already set
+            if memory.active_location:
+                if not geographic_context.get("state"):
+                    geographic_context["state"] = memory.active_location.get("state")
+                if not geographic_context.get("city"):
+                    geographic_context["city"] = memory.active_location.get("city")
+
+            # Merge memory preferences with inferred preferences
+            if memory.user_preferences:
+                for key, value in memory.user_preferences.items():
+                    if key not in user_preferences:
+                        user_preferences[key] = value
+
+            memory_confidence = memory.recall_confidence
+
+            # Boost follow-up detection if memory has active customer
+            if memory.active_customer and not is_follow_up:
+                # Check if query references memory implicitly
+                query_lower = query.lower()
+                if any(p in query_lower for p in ["again", "more", "same"]):
+                    is_follow_up = True
+
+        # Calculate context confidence (boosted by memory)
         context_confidence = self._calculate_confidence(
-            history, geographic_context, is_follow_up
+            history, geographic_context, is_follow_up, memory_confidence
         )
 
         return QueryContext(
@@ -130,6 +173,9 @@ class ContextAgent:
             prior_results=prior_results,
             is_follow_up=is_follow_up,
             context_confidence=context_confidence,
+            memory_entities=memory_entities,
+            resolved_pronouns=resolved_pronouns,
+            memory_confidence=memory_confidence,
         )
 
     async def _get_session_history(self, session_id: str | None) -> list[dict[str, Any]]:
@@ -325,6 +371,7 @@ class ContextAgent:
         history: list[dict[str, Any]],
         geographic: dict[str, str | None],
         is_follow_up: bool,
+        memory_confidence: float = 0.0,
     ) -> float:
         """Calculate confidence in extracted context.
 
@@ -332,6 +379,7 @@ class ContextAgent:
             history: Conversation history.
             geographic: Extracted geographic context.
             is_follow_up: Whether this is a follow-up.
+            memory_confidence: Confidence from memory recall.
 
         Returns:
             Confidence score (0.0 - 1.0).
@@ -353,6 +401,10 @@ class ContextAgent:
         # Reduce if follow-up but no history
         if is_follow_up and not history:
             confidence -= 0.3
+
+        # Boost from memory confidence
+        if memory_confidence > 0:
+            confidence += 0.15 * memory_confidence
 
         return max(0.0, min(1.0, round(confidence, 3)))
 

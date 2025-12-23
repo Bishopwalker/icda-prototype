@@ -325,8 +325,17 @@ async def lifespan(app: FastAPI):
     else:
         print("  Enforcer: disabled (no LLM API key found)")
 
-    # Initialize NovaClient with 7-agent pipeline + LLM enforcer
+    # Initialize NovaClient with 11-agent pipeline + LLM enforcer
     print("\nInitializing AI query pipeline...")
+
+    # Build model routing config from settings
+    model_config = {
+        "nova_lite_model": cfg.nova_lite_model,
+        "nova_pro_model": cfg.nova_pro_model,
+        "model_routing_threshold": cfg.model_routing_threshold,
+    }
+    print(f"  Model routing: micro={cfg.nova_model}, lite={cfg.nova_lite_model}, pro={cfg.nova_pro_model}")
+
     _nova = NovaClient(
         region=cfg.aws_region,
         model=cfg.nova_model,
@@ -336,14 +345,19 @@ async def lifespan(app: FastAPI):
         address_orchestrator=_orchestrator,
         session_store=_sessions,
         llm_enforcer=_enforcer,  # Pass LLM enforcer for quality validation
-        use_orchestrator=True,  # Enable 7-agent pipeline
+        use_orchestrator=True,  # Enable 11-agent pipeline
         download_manager=_download_manager,  # Pass download manager for pagination
+        model_config=model_config,  # Pass model routing config
+        cache=_cache,  # Pass cache for memory storage
     )
     if _nova.available:
         if _nova.orchestrator:
             enforcer_status = f" + {llm_client.provider} enforcer" if _enforcer.available else ""
-            print(f"  Nova AI: enabled with 7-agent orchestrator{enforcer_status}")
+            memory_status = "enabled" if _nova.orchestrator._memory_agent.available else "disabled"
+            print(f"  Nova AI: enabled with 11-agent orchestrator{enforcer_status}")
             print(f"    - KnowledgeAgent: {'enabled' if _nova.orchestrator._knowledge_agent.available else 'disabled'}")
+            print(f"    - MemoryAgent: {memory_status}")
+            print(f"    - PersonalityAgent: Witty Expert")
         else:
             print(f"  Nova AI: enabled (simple mode)")
     else:

@@ -25,6 +25,29 @@ class ParserAgent:
     """
     __slots__ = ("_db", "_available")
 
+    # Common state misspellings -> correct name
+    STATE_TYPOS = {
+        # Kansas variations
+        "kanas": "kansas", "kanses": "kansas", "kanzas": "kansas", "kanss": "kansas",
+        # California variations
+        "californa": "california", "californai": "california", "califronia": "california",
+        # Florida variations
+        "flordia": "florida", "florda": "florida", "floirda": "florida",
+        # Texas variations
+        "texs": "texas", "texsa": "texas", "teaxs": "texas",
+        # Arizona variations
+        "arizon": "arizona", "arizonia": "arizona", "arizonza": "arizona",
+        "argintina": "arizona",  # Common confusion
+        # New York variations
+        "newyork": "new york", "new yor": "new york", "newy ork": "new york",
+        # Pennsylvania variations
+        "pennsylvnia": "pennsylvania", "pensilvania": "pennsylvania", "pensylvania": "pennsylvania",
+        # Other common typos
+        "gorgia": "georgia", "virgina": "virginia", "michagan": "michigan",
+        "colordo": "colorado", "nevda": "nevada", "washingon": "washington",
+        "illnois": "illinois", "ohoi": "ohio", "noth carolina": "north carolina",
+    }
+
     # State name to code mapping (full names only - no abbreviations that conflict with words)
     STATE_NAMES = {
         "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
@@ -81,6 +104,29 @@ class ParserAgent:
         r"(\d+)\+?\s+moves?": None,  # Extract number
         r"moved\s+(?:at\s+least\s+)?(\d+)": None,  # Extract number
     }
+
+    def _correct_state_typos(self, text: str, notes: list[str]) -> str:
+        """Correct common state name misspellings.
+
+        Args:
+            text: Text to check for typos.
+            notes: List to append resolution notes.
+
+        Returns:
+            Text with typos corrected.
+        """
+        text_lower = text.lower()
+        for typo, correct in self.STATE_TYPOS.items():
+            if typo in text_lower:
+                # Replace the typo with the correct spelling
+                text = re.sub(
+                    rf"\b{re.escape(typo)}\b",
+                    correct,
+                    text,
+                    flags=re.IGNORECASE
+                )
+                notes.append(f"Corrected typo: '{typo}' → '{correct}'")
+        return text
 
     def __init__(self, db=None):
         """Initialize ParserAgent.
@@ -244,6 +290,9 @@ class ParserAgent:
                 normalized = re.sub(pattern, replacement, normalized, flags=re.IGNORECASE)
                 notes.append(f"Expanded '{pattern}' to '{replacement}'")
 
+        # Correct state typos BEFORE normalizing state names
+        normalized = self._correct_state_typos(normalized, notes)
+
         # Normalize state names to codes
         for name, code in self.STATE_NAMES.items():
             if name in normalized.lower():
@@ -304,11 +353,14 @@ class ParserAgent:
             if code not in entities["states"]:
                 entities["states"].append(code)
 
+        # Correct state typos before looking up state names
+        corrected_query = self._correct_state_typos(query, notes)
+
         # Extract state names (exact match) and convert to codes
         for name, code in self.STATE_NAMES.items():
             # Use word boundary matching to avoid partial matches
             pattern = rf"\b{re.escape(name)}\b"
-            if re.search(pattern, query.lower()) and code not in entities["states"]:
+            if re.search(pattern, corrected_query.lower()) and code not in entities["states"]:
                 entities["states"].append(code)
                 notes.append(f"State: '{name}' → {code}")
 
@@ -361,7 +413,10 @@ class ParserAgent:
             Dict of filter criteria.
         """
         filters: dict[str, Any] = {}
-        query_lower = query.lower()
+
+        # Correct state typos before processing
+        corrected_query = self._correct_state_typos(query, notes)
+        query_lower = corrected_query.lower()
         print(f"[DEBUG] ParserAgent._extract_filters: query_lower={query_lower}")
 
         # Extract state filter - use word boundaries to avoid partial matches

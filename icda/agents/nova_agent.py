@@ -31,6 +31,9 @@ from .models import (
     NovaResponse,
     TokenUsage,
     ParsedQuery,
+    PersonalityConfig,
+    PersonalityStyle,
+    MemoryContext,
 )
 from .tool_registry import ToolRegistry
 
@@ -42,10 +45,10 @@ class NovaAgent:
 
     Follows the enforcer pattern - receives only the context it needs.
     """
-    __slots__ = ("_client", "_model", "_tool_registry", "_available")
+    __slots__ = ("_client", "_model", "_tool_registry", "_available", "_personality")
 
-    # System prompt emphasizing factual accuracy to prevent hallucination
-    SYSTEM_PROMPT = """You are ICDA, a customer data assistant. Be concise and accurate.
+    # Base system prompt - personality gets added dynamically
+    BASE_SYSTEM_PROMPT = """You are ICDA, a knowledgeable customer data assistant.
 
 CRITICAL RULES:
 1. ONLY use data from the provided CONTEXT - NEVER invent or hallucinate data
@@ -56,11 +59,49 @@ CRITICAL RULES:
 
 Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
 
+    # Personality prompts for different styles
+    PERSONALITY_PROMPTS = {
+        PersonalityStyle.WITTY_EXPERT: """
+PERSONALITY (Witty Expert):
+- Be knowledgeable and confident in your responses
+- Add occasional clever observations when appropriate
+- If no results, be empathetic but keep it light
+- Never be robotic - use natural conversational language
+- Reference previous conversation naturally: "As we discussed..." or "Going back to..."
+- Example: "Ah, California customers! I've got 847 of those."
+""",
+        PersonalityStyle.FRIENDLY_PROFESSIONAL: """
+PERSONALITY (Friendly Professional):
+- Be warm and welcoming while staying professional
+- Use "I" naturally when speaking
+- Celebrate successful searches: "Great news!"
+- Be empathetic when no results found
+""",
+        PersonalityStyle.CASUAL_FUN: """
+PERSONALITY (Casual):
+- Keep it conversational and upbeat
+- Use friendly language
+- Add enthusiasm where appropriate
+""",
+        PersonalityStyle.MINIMAL: """
+PERSONALITY:
+- Be clear and helpful
+- Keep responses concise
+""",
+    }
+
+    # Memory context template
+    MEMORY_CONTEXT_TEMPLATE = """
+CONVERSATION MEMORY:
+{memory_context}
+When relevant, reference this context naturally in your response."""
+
     def __init__(
         self,
         region: str,
         model: str,
         tool_registry: ToolRegistry,
+        personality: PersonalityConfig | None = None,
     ):
         """Initialize NovaAgent.
 
@@ -68,9 +109,11 @@ Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
             region: AWS region.
             model: Bedrock model ID.
             tool_registry: Dynamic tool registry.
+            personality: Optional personality configuration.
         """
         self._model = model
         self._tool_registry = tool_registry
+        self._personality = personality or PersonalityConfig()
         self._client = None
         self._available = False
 
@@ -106,6 +149,7 @@ Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
         context: QueryContext,
         intent: IntentResult,
         model_override: str | None = None,
+        memory: MemoryContext | None = None,
     ) -> NovaResponse:
         """Generate AI response with dynamic tools.
 
@@ -116,6 +160,7 @@ Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
             context: Session context from ContextAgent.
             intent: Intent classification.
             model_override: Optional model ID to use instead of default.
+            memory: Optional memory context for entity recall.
 
         Returns:
             NovaResponse with generated text.
@@ -142,12 +187,15 @@ Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
             # Build minimal context from search (no knowledge)
             rag_context = self._build_context(search_result, knowledge)
 
+            # Build dynamic system prompt with personality and memory
+            system_prompt = self._build_dynamic_prompt(memory)
+
             # Skip tools to reduce complexity and token usage
             tools = []
 
             # Call Nova - now returns token_usage
             response, tools_used, tool_results, token_usage = await self._converse(
-                messages, tools, rag_context, model_to_use
+                messages, tools, rag_context, model_to_use, system_prompt
             )
 
             return NovaResponse(
@@ -175,6 +223,61 @@ Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
         except Exception as e:
             logger.error(f"NovaAgent error: {e}")
             return self._fallback_response(query, search_result, knowledge)
+
+    def _build_dynamic_prompt(
+        self,
+        memory: MemoryContext | None = None,
+    ) -> str:
+        """Build dynamic system prompt with personality and memory.
+
+        Args:
+            memory: Optional memory context.
+
+        Returns:
+            Complete system prompt string.
+        """
+        parts = [self.BASE_SYSTEM_PROMPT]
+
+        # Add personality prompt
+        personality_prompt = self.PERSONALITY_PROMPTS.get(
+            self._personality.style,
+            self.PERSONALITY_PROMPTS[PersonalityStyle.WITTY_EXPERT],
+        )
+        parts.append(personality_prompt)
+
+        # Add memory context if available
+        if memory and memory.recalled_entities:
+            memory_lines = []
+
+            # Add active customer context
+            if memory.active_customer:
+                customer = memory.active_customer
+                memory_lines.append(
+                    f"- Active customer: {customer.canonical_name} ({customer.entity_id})"
+                )
+                if customer.attributes.get("state"):
+                    memory_lines.append(
+                        f"  Location: {customer.attributes.get('city', '')}, {customer.attributes.get('state')}"
+                    )
+
+            # Add active location
+            if memory.active_location:
+                state = memory.active_location.get("state", "")
+                if state:
+                    memory_lines.append(f"- User has been asking about: {state}")
+
+            # Add resolved pronouns
+            if memory.resolved_pronouns:
+                for pronoun, entity_id in list(memory.resolved_pronouns.items())[:2]:
+                    memory_lines.append(f"- '{pronoun}' refers to: {entity_id}")
+
+            if memory_lines:
+                memory_context = "\n".join(memory_lines)
+                parts.append(
+                    self.MEMORY_CONTEXT_TEMPLATE.format(memory_context=memory_context)
+                )
+
+        return "\n".join(parts)
 
     # Maximum conversation history messages to include (pairs = N/2 turns)
     MAX_HISTORY_MESSAGES = 6  # 3 turns of conversation for better memory
@@ -279,6 +382,7 @@ Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
         tools: list[dict],
         context: str,
         model_id: str | None = None,
+        system_prompt: str | None = None,
     ) -> tuple[str, list[str], list[dict], TokenUsage]:
         """Call Bedrock converse API.
 
@@ -287,14 +391,16 @@ Interpret queries flexibly (e.g., "Nevada folks" = state NV)."""
             tools: Tool definitions.
             context: RAG context.
             model_id: Optional model ID override.
+            system_prompt: Optional custom system prompt with personality.
 
         Returns:
             Tuple of (response_text, tools_used, tool_results, token_usage).
         """
         model_to_use = model_id or self._model
 
-        # Build system prompt with context
-        system_prompts = [{"text": self.SYSTEM_PROMPT}]
+        # Build system prompt with context - use custom prompt if provided
+        base_prompt = system_prompt or self.BASE_SYSTEM_PROMPT
+        system_prompts = [{"text": base_prompt}]
         if context:
             system_prompts.append({"text": f"\n\nCONTEXT:\n{context}"})
 
