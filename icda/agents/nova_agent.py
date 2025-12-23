@@ -363,10 +363,12 @@ When relevant, reference this context naturally in your response."""
             for i, customer in enumerate(search_result.results[:self.MAX_CONTEXT_RESULTS], 1):
                 crid = customer.get("crid", "N/A")
                 name = customer.get("name", "N/A")
+                address = customer.get("address", "")
                 city = customer.get("city", "N/A")
                 state = customer.get("state", "N/A")
-                # Ultra-compact: CRID: Name - City, ST
-                parts.append(f"{i}. {crid}: {name} - {city}, {state}")
+                moves = customer.get("move_count", 0)
+                # Include address to show apartment/unit info
+                parts.append(f"{i}. {crid}: {name} | {address}, {city}, {state} | Moves: {moves}")
 
             if total > self.MAX_CONTEXT_RESULTS:
                 parts.append(f"...+{total - self.MAX_CONTEXT_RESULTS} more")
@@ -404,16 +406,17 @@ When relevant, reference this context naturally in your response."""
         if context:
             system_prompts.append({"text": f"\n\nCONTEXT:\n{context}"})
 
-        # Initial call
-        tool_config = {"tools": tools, "toolChoice": {"auto": {}}} if tools else None
+        # Initial call - only include toolConfig if tools are provided
+        converse_params = {
+            "modelId": model_to_use,
+            "messages": messages,
+            "system": system_prompts,
+            "inferenceConfig": {"maxTokens": 4096, "temperature": 0.1},
+        }
+        if tools:
+            converse_params["toolConfig"] = {"tools": tools, "toolChoice": {"auto": {}}}
 
-        response = self._client.converse(
-            modelId=model_to_use,
-            messages=messages,
-            system=system_prompts,
-            toolConfig=tool_config,
-            inferenceConfig={"maxTokens": 4096, "temperature": 0.1},
-        )
+        response = self._client.converse(**converse_params)
 
         content = response["output"]["message"]["content"]
         tools_used = []
@@ -454,13 +457,16 @@ When relevant, reference this context naturally in your response."""
                 {"role": "user", "content": tool_results}
             ]
 
-            follow_response = self._client.converse(
-                modelId=model_to_use,
-                messages=follow_messages,
-                system=system_prompts,
-                toolConfig=tool_config,
-                inferenceConfig={"maxTokens": 4096, "temperature": 0.1},
-            )
+            follow_params = {
+                "modelId": model_to_use,
+                "messages": follow_messages,
+                "system": system_prompts,
+                "inferenceConfig": {"maxTokens": 4096, "temperature": 0.1},
+            }
+            if tools:
+                follow_params["toolConfig"] = {"tools": tools, "toolChoice": {"auto": {}}}
+
+            follow_response = self._client.converse(**follow_params)
 
             # Aggregate token usage from follow-up call
             follow_usage = follow_response.get("usage", {})
