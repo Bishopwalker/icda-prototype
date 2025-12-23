@@ -50,7 +50,7 @@ class NovaClient:
 
     The orchestrated mode is enabled by default when available.
     """
-    __slots__ = ("client", "model", "available", "db", "_orchestrator", "_use_orchestrator", "_download_manager")
+    __slots__ = ("client", "model", "available", "db", "_orchestrator", "_use_orchestrator", "_download_manager", "_cache")
 
     _PROMPT = """You are ICDA, a customer data assistant. Be concise and helpful.
 
