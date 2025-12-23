@@ -90,12 +90,13 @@ QUERY INTERPRETATION:
         llm_enforcer=None,
         use_orchestrator: bool = True,
         download_manager=None,
+        model_config: dict[str, Any] | None = None,
     ):
         """Initialize NovaClient with optional 7-agent pipeline + LLM enforcer.
 
         Args:
             region: AWS region for Bedrock.
-            model: Bedrock model ID.
+            model: Bedrock model ID (base/micro model).
             db: CustomerDB instance.
             vector_index: Optional VectorIndex for semantic search.
             knowledge: Optional KnowledgeManager for RAG.
@@ -105,6 +106,10 @@ QUERY INTERPRETATION:
             llm_enforcer: Optional LLMEnforcer for AI-powered validation.
             use_orchestrator: Whether to use 8-agent pipeline (default True).
             download_manager: Optional DownloadTokenManager for pagination.
+            model_config: Optional model routing config with keys:
+                - nova_lite_model: Model ID for medium complexity
+                - nova_pro_model: Model ID for complex queries
+                - model_routing_threshold: Confidence threshold for escalation
         """
         self.model = model
         self.db = db
@@ -143,6 +148,7 @@ QUERY INTERPRETATION:
                         guardrails=guardrails,
                         llm_enforcer=llm_enforcer,
                         download_manager=download_manager,
+                        config=model_config,  # Pass model routing config
                     )
                     enforcer_status = f"with {llm_enforcer.client.provider}" if (llm_enforcer and llm_enforcer.available) else "without enforcer"
                     logger.info(f"Nova: 7-agent orchestrator enabled ({enforcer_status})")

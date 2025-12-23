@@ -327,6 +327,15 @@ async def lifespan(app: FastAPI):
 
     # Initialize NovaClient with 7-agent pipeline + LLM enforcer
     print("\nInitializing AI query pipeline...")
+    
+    # Build model routing config from settings
+    model_config = {
+        "nova_lite_model": cfg.nova_lite_model,
+        "nova_pro_model": cfg.nova_pro_model,
+        "model_routing_threshold": cfg.model_routing_threshold,
+    }
+    print(f"  Model routing: micro={cfg.nova_model}, lite={cfg.nova_lite_model}, pro={cfg.nova_pro_model}")
+    
     _nova = NovaClient(
         region=cfg.aws_region,
         model=cfg.nova_model,
@@ -338,6 +347,7 @@ async def lifespan(app: FastAPI):
         llm_enforcer=_enforcer,  # Pass LLM enforcer for quality validation
         use_orchestrator=True,  # Enable 7-agent pipeline
         download_manager=_download_manager,  # Pass download manager for pagination
+        model_config=model_config,  # Pass model routing config
     )
     if _nova.available:
         if _nova.orchestrator:
