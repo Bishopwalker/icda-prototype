@@ -41,6 +41,7 @@ from .models import (
     PersonalityConfig,
     PersonalityContext,
     SuggestionContext,
+    EscalationContext,
 )
 from .tool_registry import ToolRegistry, create_default_registry
 from .model_router import ModelRouter
@@ -55,6 +56,7 @@ from .enforcer_agent import EnforcerAgent
 from .memory_agent import MemoryAgent
 from .personality_agent import PersonalityAgent
 from .suggestion_agent import SuggestionAgent
+from .failure_tracker import FailureTracker
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +95,7 @@ class QueryOrchestrator:
         "_download_manager",
         "_personality_config",
         "_cache",
+        "_failure_tracker",
     )
 
     def __init__(
@@ -175,6 +178,7 @@ class QueryOrchestrator:
         )
         self._personality_agent = PersonalityAgent(config=self._personality_config)
         self._suggestion_agent = SuggestionAgent()
+        self._failure_tracker = FailureTracker(cache=cache)
 
         # Log initialization with enforcer status
         enforcer_status = f"enabled ({llm_enforcer.client.provider})" if (llm_enforcer and llm_enforcer.available) else "disabled"
@@ -274,12 +278,24 @@ class QueryOrchestrator:
                 trace,
             )
 
+            # Check for retry escalation (wrong answer tracking)
+            escalation = await self._failure_tracker.check_for_retry(
+                session_id=session_id or "anonymous",
+                query=query,
+            )
+            if escalation.is_retry:
+                logger.info(
+                    f"Retry detected: level={escalation.escalation_level}, "
+                    f"excluded={escalation.excluded_strategies}"
+                )
+
             # Stage 6 & 7: Search + Knowledge (parallel)
             search_result, knowledge = await self._run_parallel_stages(
                 search_coro=self._search_agent.search(
                     resolved=resolved,
                     parsed=parsed,
                     intent=intent,
+                    escalation=escalation,
                 ),
                 knowledge_coro=self._knowledge_agent.retrieve(
                     query=query,
@@ -336,6 +352,26 @@ class QueryOrchestrator:
                 ),
                 trace,
             )
+
+            # Track failures or clear on success (wrong answer prevention)
+            strategies_tried = [search_result.strategy_used.value]
+            strategies_tried.extend(search_result.alternatives_tried or [])
+
+            if self._enforcer_agent.should_escalate(enforced):
+                await self._failure_tracker.record_failure(
+                    session_id=session_id or "anonymous",
+                    query=query,
+                    enforced=enforced,
+                    strategies_tried=strategies_tried,
+                )
+                logger.info(
+                    f"Failure recorded for escalation: quality_score={enforced.quality_score}"
+                )
+            else:
+                await self._failure_tracker.clear_on_success(
+                    session_id=session_id or "anonymous",
+                    query=query,
+                )
 
             # Stage 10: Personality Enhancement (NEW)
             # Add warmth and wit to the response (Witty Expert style)

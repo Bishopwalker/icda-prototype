@@ -105,11 +105,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onDownloa
         elevation={0}
         sx={{
           p: 2,
-          borderRadius: borderRadius.lg,
+          borderRadius: borderRadius.md,
           width: 'fit-content',
           minWidth: 0,
           maxWidth: '100%',
-          overflow: 'hidden',
           transition: transitions.fast,
           // User message styling
           ...(isUser && {

@@ -1,6 +1,7 @@
 """Caching with Redis or in-memory fallback.
 
 Works in LITE MODE (no Redis) with automatic in-memory fallback.
+Supports health-aware caching - bypasses cache when index is unhealthy.
 """
 
 from functools import cache
@@ -9,15 +10,24 @@ from time import time
 
 
 class RedisCache:
-    """Async cache with Redis or in-memory fallback."""
-    
-    __slots__ = ("client", "ttl", "available", "_fallback")
+    """Async cache with Redis or in-memory fallback.
+
+    Supports health-aware caching that bypasses cache when the
+    search index is unhealthy to prevent serving stale results.
+    """
+
+    __slots__ = (
+        "client", "ttl", "available", "_fallback",
+        "_index_healthy", "_last_health_update"
+    )
 
     def __init__(self, ttl: int = 43200):
         self.ttl = ttl
         self.client = None
         self.available = False
         self._fallback: dict[str, tuple[str, float]] = {}
+        self._index_healthy = True  # Assume healthy until told otherwise
+        self._last_health_update = 0.0
 
     async def connect(self, url: str) -> None:
         """Connect to Redis or use in-memory fallback."""
@@ -92,3 +102,53 @@ class RedisCache:
     @cache
     def make_key(query: str) -> str:
         return f"icda:q:{sha256(query.casefold().strip().encode()).hexdigest()[:16]}"
+
+    # =========================================================================
+    # Health-Aware Caching Methods
+    # =========================================================================
+
+    def set_index_health(self, healthy: bool) -> None:
+        """Update index health status from external health check.
+
+        Args:
+            healthy: Whether the search index is healthy.
+        """
+        self._index_healthy = healthy
+        self._last_health_update = time()
+
+    @property
+    def index_healthy(self) -> bool:
+        """Check if the search index is healthy."""
+        return self._index_healthy
+
+    @property
+    def should_use_cache(self) -> bool:
+        """Check if cache should be used based on index health.
+
+        Returns False if index is unhealthy, preventing stale results.
+        """
+        return self._index_healthy
+
+    async def get_if_healthy(self, key: str) -> str | None:
+        """Get from cache only if index is healthy.
+
+        Args:
+            key: Cache key.
+
+        Returns:
+            Cached value or None if unhealthy/not found.
+        """
+        if not self._index_healthy:
+            return None  # Bypass cache when index unhealthy
+        return await self.get(key)
+
+    async def set_if_healthy(self, key: str, value: str) -> None:
+        """Set in cache only if index is healthy.
+
+        Args:
+            key: Cache key.
+            value: Value to cache.
+        """
+        if not self._index_healthy:
+            return  # Don't cache results from fallback mode
+        await self.set(key, value)

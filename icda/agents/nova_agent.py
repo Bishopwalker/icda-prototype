@@ -150,6 +150,7 @@ When relevant, reference this context naturally in your response."""
         intent: IntentResult,
         model_override: str | None = None,
         memory: MemoryContext | None = None,
+        enable_tools: bool = True,
     ) -> NovaResponse:
         """Generate AI response with dynamic tools.
 
@@ -161,6 +162,7 @@ When relevant, reference this context naturally in your response."""
             intent: Intent classification.
             model_override: Optional model ID to use instead of default.
             memory: Optional memory context for entity recall.
+            enable_tools: Whether to enable Nova tool calling.
 
         Returns:
             NovaResponse with generated text.
@@ -190,8 +192,14 @@ When relevant, reference this context naturally in your response."""
             # Build dynamic system prompt with personality and memory
             system_prompt = self._build_dynamic_prompt(memory)
 
-            # Skip tools to reduce complexity and token usage
-            tools = []
+            # Get tools from registry based on intent (if enabled)
+            # Tools allow Nova to fetch additional data during response generation
+            if enable_tools and self._tool_registry:
+                tools = self._tool_registry.get_tools_for_intent(intent)
+                if tools:
+                    logger.debug(f"Nova tools enabled: {[t.get('name') for t in tools]}")
+            else:
+                tools = []
 
             # Call Nova - now returns token_usage
             response, tools_used, tool_results, token_usage = await self._converse(

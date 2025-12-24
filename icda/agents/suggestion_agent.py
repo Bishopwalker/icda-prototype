@@ -21,6 +21,7 @@ from .models import (
     SearchResult,
     EnforcedResponse,
     ResolvedQuery,
+    CityStateMismatch,
 )
 
 logger = logging.getLogger(__name__)
@@ -161,7 +162,11 @@ class SuggestionAgent:
         typo_suggestions = self._detect_typos(query, parsed)
         suggestions.extend(typo_suggestions)
 
-        # 2. Handle empty results
+        # 2. Check for city/state mismatch
+        mismatch_suggestions = self._handle_city_state_mismatch(parsed)
+        suggestions.extend(mismatch_suggestions)
+
+        # 3. Handle empty results
         if search_result.total_matches == 0:
             empty_suggestions = self._handle_empty_results(
                 query, parsed, search_result, resolved
@@ -241,6 +246,60 @@ class SuggestionAgent:
             if "corrected typo" in note.lower():
                 # Already corrected, high confidence
                 pass
+
+        return suggestions
+
+    def _handle_city_state_mismatch(
+        self,
+        parsed: ParsedQuery,
+    ) -> list[Suggestion]:
+        """Generate suggestions for city/state mismatches.
+
+        When a city doesn't match the expected state (e.g., "Miami, TX"
+        when Miami is typically in Florida), generate a "Did you mean?"
+        suggestion.
+
+        Args:
+            parsed: Parsed query with filters.
+
+        Returns:
+            List of suggestions (max 1 for mismatch).
+        """
+        suggestions = []
+
+        # Check if there's a city/state mismatch stored in filters
+        mismatch = parsed.filters.get("_city_state_mismatch")
+        if not mismatch:
+            return suggestions
+
+        # Ensure it's a CityStateMismatch object
+        if not isinstance(mismatch, CityStateMismatch):
+            return suggestions
+
+        if not mismatch.has_mismatch or not mismatch.expected_state:
+            return suggestions
+
+        # Get the full state name for better readability
+        expected_name = STATE_NAMES.get(
+            mismatch.expected_state, mismatch.expected_state
+        )
+        stated_name = STATE_NAMES.get(
+            mismatch.stated_state, mismatch.stated_state
+        )
+
+        suggestions.append(Suggestion(
+            suggestion_type=SuggestionType.QUERY_REFINEMENT,
+            original=f"{mismatch.city}, {stated_name}",
+            suggested=f"{mismatch.city}, {expected_name}",
+            reason=f"Did you mean {mismatch.city}, {expected_name}?",
+            confidence=mismatch.confidence,
+            action_query=f"customers in {mismatch.city}, {expected_name}",
+        ))
+
+        logger.info(
+            f"Generated city/state mismatch suggestion: "
+            f"{mismatch.city}, {mismatch.stated_state} -> {mismatch.expected_state}"
+        )
 
         return suggestions
 

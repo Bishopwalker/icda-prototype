@@ -602,3 +602,31 @@ class EnforcerAgent:
             return ResponseStatus.MODIFIED
 
         return ResponseStatus.APPROVED
+
+    def should_escalate(self, enforced: EnforcedResponse) -> bool:
+        """Check if quality warrants strategy escalation.
+
+        Used by the wrong answer tracker to determine if a query
+        should be retried with different search strategies.
+
+        Args:
+            enforced: The enforced response to evaluate.
+
+        Returns:
+            True if escalation is warranted.
+        """
+        # Low quality score indicates poor response
+        if enforced.quality_score < 0.5:
+            return True
+
+        # Critical gate failures warrant escalation
+        critical_gates = {QualityGate.FACTUAL, QualityGate.RESPONSIVE}
+        for gate_result in enforced.gates_failed:
+            if gate_result.gate in critical_gates:
+                return True
+
+        # Rejection status always warrants escalation
+        if enforced.status == ResponseStatus.REJECTED:
+            return True
+
+        return False

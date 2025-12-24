@@ -70,7 +70,7 @@ class ResolverAgent:
             expanded_scope.update(state_validation)
             if not state_validation.get("state_valid", True):
                 unresolved.append(f"state:{state_validation.get('requested_state')}")
-                print(f"[DEBUG] ResolverAgent: Invalid state detected - clearing fallback strategies")
+                logger.debug("ResolverAgent: Invalid state detected - clearing fallback strategies")
 
         # Resolve CRIDs
         if parsed.entities.get("crids"):
@@ -88,7 +88,7 @@ class ResolverAgent:
         if state_validation and not state_validation.get("state_valid", True):
             # No fallback strategies for invalid state - let search agent handle gracefully
             fallback_strategies = []
-            print(f"[DEBUG] ResolverAgent: No fallback strategies - state is invalid")
+            logger.debug("ResolverAgent: No fallback strategies - state is invalid")
         else:
             # Determine fallback strategies based on what we have
             fallback_strategies = self._determine_fallbacks(parsed, resolved_crids)
@@ -117,22 +117,22 @@ class ResolverAgent:
             Dict with validation info or None if no state filter.
         """
         requested_state = parsed.filters.get("state")
-        print(f"[DEBUG] ResolverAgent._validate_state: requested_state={requested_state}")
+        logger.debug(f"ResolverAgent._validate_state: requested_state={requested_state}")
         if not requested_state:
             return None
 
         # Get available states from database
         available_states = set(self._db.by_state.keys())
-        print(f"[DEBUG] ResolverAgent._validate_state: available_states={available_states}")
-        
+        logger.debug(f"ResolverAgent._validate_state: available_states={available_states}")
+
         if requested_state.upper() in available_states:
-            print(f"[DEBUG] ResolverAgent._validate_state: state {requested_state} IS VALID")
+            logger.debug(f"ResolverAgent._validate_state: state {requested_state} IS VALID")
             return {
                 "state_valid": True,
                 "requested_state": requested_state.upper(),
             }
-        
-        print(f"[DEBUG] ResolverAgent._validate_state: state {requested_state} NOT IN DATABASE!")
+
+        logger.debug(f"ResolverAgent._validate_state: state {requested_state} NOT IN DATABASE!")
         
         # State not found - provide helpful alternatives
         # Get states with customer counts, sorted by count descending

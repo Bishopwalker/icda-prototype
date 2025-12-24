@@ -50,6 +50,19 @@ class SearchStrategy(str, Enum):
     KEYWORD = "keyword"         # Simple keyword matching
 
 
+class MatchQuality(str, Enum):
+    """Quality level of search result matches.
+
+    Used to indicate how confident we are in the search results.
+    Displayed to users so they know if results are exact or approximate.
+    """
+    EXACT = "exact"             # Direct lookup or 100% filter match
+    PARTIAL = "partial"         # Good match, confidence > 0.7
+    FUZZY = "fuzzy"             # Typo-tolerant, confidence 0.5-0.7
+    SEMANTIC = "semantic"       # Vector similarity match
+    APPROXIMATE = "approximate" # Low confidence, < 0.5
+
+
 class ModelTier(str, Enum):
     """Nova model tiers for routing."""
     MICRO = "nova-micro"
@@ -277,6 +290,137 @@ class PersonalityContext:
             "personality_applied": self.personality_applied,
             "enhancements_made": self.enhancements_made,
             "tone_score": self.tone_score,
+        }
+
+
+# ============================================================================
+# Failure Tracking and Escalation Dataclasses
+# ============================================================================
+
+@dataclass(slots=True)
+class FailureRecord:
+    """Record of a failed query attempt for tracking and escalation.
+
+    Used by FailureTracker to remember which queries failed and why,
+    enabling the system to try different strategies on retry.
+
+    Attributes:
+        query_hash: Hash of normalized query for matching repeat queries.
+        original_query: Original query text.
+        failed_gates: Which quality gates failed.
+        failed_strategies: Strategies that were tried and failed.
+        last_response: The response that was rejected.
+        failure_count: Number of times this query pattern failed.
+        created_at: Timestamp of first failure.
+        last_attempt: Timestamp of most recent attempt.
+        session_id: Session this failure belongs to.
+    """
+    query_hash: str
+    original_query: str
+    failed_gates: list[QualityGate] = field(default_factory=list)
+    failed_strategies: list[str] = field(default_factory=list)
+    last_response: str = ""
+    failure_count: int = 1
+    created_at: float = 0.0
+    last_attempt: float = 0.0
+    session_id: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary representation."""
+        return {
+            "query_hash": self.query_hash,
+            "original_query": self.original_query,
+            "failed_gates": [g.value for g in self.failed_gates],
+            "failed_strategies": self.failed_strategies,
+            "last_response": self.last_response[:200] if self.last_response else "",
+            "failure_count": self.failure_count,
+            "created_at": self.created_at,
+            "last_attempt": self.last_attempt,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "FailureRecord":
+        """Create from dictionary."""
+        return cls(
+            query_hash=data["query_hash"],
+            original_query=data["original_query"],
+            failed_gates=[QualityGate(g) for g in data.get("failed_gates", [])],
+            failed_strategies=data.get("failed_strategies", []),
+            last_response=data.get("last_response", ""),
+            failure_count=data.get("failure_count", 1),
+            created_at=data.get("created_at", 0.0),
+            last_attempt=data.get("last_attempt", 0.0),
+            session_id=data.get("session_id"),
+        )
+
+
+@dataclass(slots=True)
+class EscalationContext:
+    """Context for strategy escalation after failed queries.
+
+    Provides information about previous failures and which strategies
+    to try or skip when processing a retry query.
+
+    Attributes:
+        is_retry: Whether this is a retry of a previously failed query.
+        previous_failures: History of failures for this query pattern.
+        excluded_strategies: Strategies to skip (previously failed).
+        escalation_level: Current escalation level (0-4).
+        user_message: Message to show user about escalation.
+        recommended_strategies: Strategies to try in order.
+    """
+    is_retry: bool = False
+    previous_failures: list[FailureRecord] = field(default_factory=list)
+    excluded_strategies: list[str] = field(default_factory=list)
+    escalation_level: int = 0
+    user_message: str | None = None
+    recommended_strategies: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary representation."""
+        return {
+            "is_retry": self.is_retry,
+            "excluded_strategies": self.excluded_strategies,
+            "escalation_level": self.escalation_level,
+            "user_message": self.user_message,
+            "recommended_strategies": self.recommended_strategies,
+        }
+
+
+@dataclass(slots=True)
+class CityStateMismatch:
+    """Result of city/state validation.
+
+    Detects when a city doesn't match the expected state,
+    e.g., "Miami, TX" when Miami is typically in Florida.
+
+    Attributes:
+        has_mismatch: Whether a mismatch was detected.
+        city: The city that was queried.
+        stated_state: The state provided in the query.
+        expected_state: The expected/typical state for this city.
+        suggestion: Human-readable suggestion message.
+        confidence: Confidence in the mismatch detection.
+        is_ambiguous: True if city exists in multiple states.
+    """
+    has_mismatch: bool
+    city: str
+    stated_state: str
+    expected_state: str | None = None
+    suggestion: str | None = None
+    confidence: float = 0.0
+    is_ambiguous: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary representation."""
+        return {
+            "has_mismatch": self.has_mismatch,
+            "city": self.city,
+            "stated_state": self.stated_state,
+            "expected_state": self.expected_state,
+            "suggestion": self.suggestion,
+            "confidence": self.confidence,
+            "is_ambiguous": self.is_ambiguous,
         }
 
 
@@ -549,6 +693,7 @@ class SearchResult:
         search_metadata: Timing, scores, etc.
         alternatives_tried: Strategies attempted before success.
         search_confidence: Confidence in results.
+        match_quality: Quality level of the matches (EXACT/PARTIAL/FUZZY/etc).
         state_not_available: True if requested state not in dataset.
         requested_state: State code that was requested but not available.
         requested_state_name: Full name of requested state.
@@ -562,6 +707,8 @@ class SearchResult:
     search_metadata: dict[str, Any] = field(default_factory=dict)
     alternatives_tried: list[str] = field(default_factory=list)
     search_confidence: float = 0.0
+    # Match quality field - indicates how confident we are in the results
+    match_quality: MatchQuality = MatchQuality.PARTIAL
     # State availability fields
     state_not_available: bool = False
     requested_state: str | None = None
@@ -578,6 +725,7 @@ class SearchResult:
             "total_matches": self.total_matches,
             "alternatives_tried": self.alternatives_tried,
             "search_confidence": self.search_confidence,
+            "match_quality": self.match_quality.value,
         }
         # Add state availability info if state not available
         if self.state_not_available:

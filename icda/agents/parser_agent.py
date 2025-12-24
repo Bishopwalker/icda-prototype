@@ -14,6 +14,7 @@ from difflib import get_close_matches
 from typing import Any
 
 from .models import IntentResult, QueryContext, ParsedQuery
+from .city_state_validator import CityStateValidator
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class ParserAgent:
 
     Follows the enforcer pattern - receives only the context it needs.
     """
-    __slots__ = ("_db", "_available")
+    __slots__ = ("_db", "_available", "_city_state_validator")
 
     # Common state misspellings -> correct name
     STATE_TYPOS = {
@@ -136,6 +137,7 @@ class ParserAgent:
         """
         self._db = db
         self._available = True
+        self._city_state_validator = CityStateValidator()
 
     @property
     def available(self) -> bool:
@@ -347,7 +349,7 @@ class ParserAgent:
             # For ambiguous codes (IN, OR, ME, etc.), require clear context
             if code in self.AMBIGUOUS_STATE_CODES:
                 if not self._is_likely_state_code_context(query, code, position):
-                    print(f"[DEBUG] Skipping ambiguous state code '{code}' - not in state context")
+                    logger.debug(f"Skipping ambiguous state code '{code}' - not in state context")
                     continue
 
             if code not in entities["states"]:
@@ -417,14 +419,14 @@ class ParserAgent:
         # Correct state typos before processing
         corrected_query = self._correct_state_typos(query, notes)
         query_lower = corrected_query.lower()
-        print(f"[DEBUG] ParserAgent._extract_filters: query_lower={query_lower}")
+        logger.debug(f"ParserAgent._extract_filters: query_lower={query_lower}")
 
         # Extract state filter - use word boundaries to avoid partial matches
         for name, code in self.STATE_NAMES.items():
             pattern = rf"\b{re.escape(name)}\b"
             if re.search(pattern, query_lower):
                 filters["state"] = code
-                print(f"[DEBUG] ParserAgent._extract_filters: Found state name '{name}' -> {code}")
+                logger.debug(f"ParserAgent._extract_filters: Found state name '{name}' -> {code}")
                 break
 
         # Try fuzzy matching for misspelled state names if no exact match
@@ -434,7 +436,7 @@ class ParserAgent:
                 fuzzy_code = self._fuzzy_match_state(word, notes)
                 if fuzzy_code:
                     filters["state"] = fuzzy_code
-                    print(f"[DEBUG] ParserAgent._extract_filters: Fuzzy matched '{word}' -> {fuzzy_code}")
+                    logger.debug(f"ParserAgent._extract_filters: Fuzzy matched '{word}' -> {fuzzy_code}")
                     break
 
         # Check for state codes (but filter out ambiguous ones without context)
@@ -449,7 +451,7 @@ class ParserAgent:
                 # For ambiguous codes, require clear context
                 if code in self.AMBIGUOUS_STATE_CODES:
                     if not self._is_likely_state_code_context(query, code, position):
-                        print(f"[DEBUG] Skipping ambiguous state code '{code}' in filters")
+                        logger.debug(f"Skipping ambiguous state code '{code}' in filters")
                         continue
 
                 filters["state"] = code
@@ -488,6 +490,23 @@ class ParserAgent:
                     filters["city"] = city
                     break
 
+        # Validate city/state combination (if both are present)
+        if "city" in filters and "state" in filters:
+            mismatch = self._city_state_validator.validate(
+                filters["city"], filters["state"]
+            )
+            if mismatch.has_mismatch:
+                # Store mismatch for suggestion generation
+                filters["_city_state_mismatch"] = mismatch
+                notes.append(
+                    f"City/state mismatch detected: {mismatch.city}, "
+                    f"{mismatch.stated_state} - expected {mismatch.expected_state}"
+                )
+                logger.info(
+                    f"City/state mismatch: {mismatch.city}, {mismatch.stated_state} "
+                    f"(expected: {mismatch.expected_state})"
+                )
+
         # Extract customer type filter
         if any(word in query_lower for word in ["business", "company", "companies", "corporate"]):
             filters["customer_type"] = "BUSINESS"
@@ -504,7 +523,7 @@ class ParserAgent:
             filters["has_apartment"] = True
             notes.append("Filter: apartment/unit addresses only")
 
-        print(f"[DEBUG] ParserAgent._extract_filters: FINAL filters={filters}")
+        logger.debug(f"ParserAgent._extract_filters: FINAL filters={filters}")
         return filters
 
     def _extract_date_range(

@@ -31,8 +31,11 @@ class RouteType(str, Enum):
 
 class VectorIndex:
     """Vector search with OpenSearch or keyword fallback."""
-    
-    __slots__ = ("client", "index", "customer_index", "available", "embedder", "host", "region", "is_serverless")
+
+    __slots__ = (
+        "client", "index", "customer_index", "available", "embedder",
+        "host", "region", "is_serverless", "_healthy", "_last_health_check"
+    )
 
     INDEX_MAPPING = {
         "settings": {"index": {"knn": True}},
@@ -82,6 +85,8 @@ class VectorIndex:
         self.host = ""
         self.region = ""
         self.is_serverless = False
+        self._healthy = False
+        self._last_health_check = 0.0
 
     async def connect(self, host: str, region: str) -> None:
         """Connect to OpenSearch or fall back to keyword routing."""
@@ -131,10 +136,63 @@ class VectorIndex:
             else:
                 await self.client.info()
             self.available = True
+            self._healthy = True
             print(f"VectorIndex: Connected to OpenSearch")
             await self._ensure_index()
         except Exception as e:
             print(f"VectorIndex: Connection failed ({e}) - using keyword routing")
+
+    @property
+    def is_healthy(self) -> bool:
+        """Check if the index is healthy (quick synchronous check)."""
+        return self._healthy and self.available
+
+    async def health_check(self) -> dict:
+        """Check OpenSearch cluster health.
+
+        Returns:
+            Dict with health status, latency, and details.
+        """
+        import time
+
+        if not self.available or not self.client:
+            self._healthy = False
+            return {"healthy": False, "reason": "not_connected"}
+
+        try:
+            start = time.time()
+
+            if self.is_serverless:
+                # For serverless, just check if we can list indices
+                await self.client.indices.get_alias()
+                status = "green"  # Serverless doesn't have cluster health
+            else:
+                # For managed OpenSearch, check cluster health
+                info = await self.client.cluster.health()
+                status = info.get("status", "unknown")
+
+                # Red cluster is unhealthy
+                if status == "red":
+                    self._healthy = False
+                    return {
+                        "healthy": False,
+                        "reason": "cluster_red",
+                        "status": status,
+                    }
+
+            latency_ms = int((time.time() - start) * 1000)
+            self._healthy = True
+            self._last_health_check = time.time()
+
+            return {
+                "healthy": True,
+                "status": status,
+                "latency_ms": latency_ms,
+            }
+
+        except Exception as e:
+            self._healthy = False
+            return {"healthy": False, "reason": str(e)}
 
     async def _ensure_index(self) -> None:
         if not await self.client.indices.exists(index=self.index):

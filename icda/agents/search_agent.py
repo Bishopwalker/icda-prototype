@@ -17,7 +17,9 @@ from .models import (
     ResolvedQuery,
     SearchResult,
     SearchStrategy,
+    EscalationContext,
 )
+from .failure_tracker import apply_escalation
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +52,7 @@ class SearchAgent:
         resolved: ResolvedQuery,
         parsed: ParsedQuery,
         intent: IntentResult,
+        escalation: EscalationContext | None = None,
     ) -> SearchResult:
         """Execute search based on resolved query.
 
@@ -57,18 +60,25 @@ class SearchAgent:
             resolved: Resolved query from ResolverAgent.
             parsed: Parsed query from ParserAgent.
             intent: Intent classification.
+            escalation: Optional escalation context for retried queries.
 
         Returns:
             SearchResult with results and metadata.
         """
-        # ============================================================
-        # CRITICAL FIX: Check if requested state is invalid FIRST
+        # Apply escalation if provided (skip previously failed strategies)
+        strategies = resolved.fallback_strategies
+        if escalation and escalation.is_retry:
+            strategies = apply_escalation(strategies, escalation)
+            logger.info(
+                f"Escalation applied: level={escalation.escalation_level}, "
+                f"strategies={strategies}, excluded={escalation.excluded_strategies}"
+            )
+        # Check if requested state is invalid FIRST
         # This prevents searching for states that don't exist and
         # returns helpful alternatives to the user
-        # ============================================================
-        print(f"[DEBUG] SearchAgent.search: expanded_scope={resolved.expanded_scope}")
+        logger.debug(f"SearchAgent.search: expanded_scope={resolved.expanded_scope}")
         if resolved.expanded_scope.get("state_valid") is False:
-            print(f"[DEBUG] SearchAgent.search: STATE NOT VALID - returning state_not_available response")
+            logger.debug("SearchAgent.search: STATE NOT VALID - returning state_not_available response")
             state_info = resolved.expanded_scope
             # Build state counts dict from available_states_with_counts list
             state_counts_dict = {}
@@ -109,7 +119,7 @@ class SearchAgent:
         strategy_used = SearchStrategy.KEYWORD
         metadata = {}
 
-        for strategy in resolved.fallback_strategies:
+        for strategy in strategies:
             try:
                 strategy_results, strategy_meta = await self._execute_strategy(
                     strategy, parsed, resolved, intent
@@ -119,7 +129,6 @@ class SearchAgent:
                 # This prevents fallback to basic_search which would return random unfiltered results
                 if strategy_meta.get("error") == "state_not_available":
                     logger.info(f"State not available - stopping fallback chain at {strategy}")
-                    print(f"[DEBUG] SearchAgent: state_not_available detected in {strategy}, stopping fallbacks")
                     # Return empty results with state info - don't try more strategies
                     return SearchResult(
                         strategy_used=SearchStrategy.KEYWORD,
