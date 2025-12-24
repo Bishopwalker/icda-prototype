@@ -432,11 +432,16 @@ class QueryOrchestrator:
                 )
 
             # Apply pagination if download_manager available
+            # Only create download tokens if response quality is acceptable
+            # This prevents showing download options when Nova/Enforcer failed
             pagination = None
             preview_results = None
             full_results = search_result.results
+            min_quality_for_download = self._config.get("min_quality_for_download", 0.3)
 
-            if self._download_manager and search_result.total_matches > 0:
+            if (self._download_manager
+                and search_result.total_matches > 0
+                and enforced.quality_score >= min_quality_for_download):
                 preview_results, pagination_dict = self._download_manager.create_download_token(
                     results=full_results,
                     query=query,
